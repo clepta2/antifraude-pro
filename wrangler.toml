@@ -1,0 +1,16 @@
+name = "antifraude-pro-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+routes = [
+  { pattern = "antifraude.ozpro.com.br", custom_domain = true }
+]
+
+[vars]
+CLOUDFLARE_ACCOUNT_ID = "77f8849b9c692c78d3d77e26a0babefd"
+CLOUDFLARE_R2_BUCKET = "ozpro-antifraude"
+
+# Bucket R2 para armazenar histórico e listas de reputação de IP / Fingerprint
+[[r2_buckets]]
+binding = "ANTIFRAUDE_R2"
+bucket_name = "ozpro-antifraude"

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AntiFraude Pro — Segurança, Device Fingerprint &amp; Score de Risco</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg: #050811;
+      --card: #0c1222;
+      --card-inner: #111a30;
+      --card-hover: #16223f;
+      --primary: #10b981;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.25);
+      --warning: #f59e0b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(16, 185, 129, 0.5);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --code-bg: #030712;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      padding: 0 20px;
+    }
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 35px;
+    }
+    .badge-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 9999px;
+      color: var(--primary);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .badge-pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--primary);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.3); }
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 40%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 740px;
+      margin: 0 auto;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      background: var(--card);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 30px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: #022c22;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 840px) {
+      .grid-2, .grid-4 { grid-template-columns: 1fr; }
+      .tabs { flex-direction: column; }
+    }
+    .stat-box {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .stat-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      word-break: break-all;
+    }
+    .input-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input, select {
+      width: 100%;
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 0.92rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+    .btn-action {
+      background: var(--primary);
+      color: #022c22;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-action:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+    .preset-btn {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .score-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      border-radius: 16px;
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .score-circle {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      border: 4px solid var(--primary);
+      box-shadow: 0 0 25px var(--primary-glow);
+      transition: all 0.4s ease;
+    }
+    .score-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .score-max {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .factor-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: var(--card-inner);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+    .factor-peso {
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+    }
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge-top">
+        <span class="badge-pulse"></span>
+        Zero Cookies &bull; LGPD &amp; GDPR Compliant &bull; Latência Sub-2ms
+      </div>
+      <h1>AntiFraude Pro Studio</h1>
+      <p class="subtitle">
+        Inteligência de segurança em borda Anycast: Device Fingerprint determinístico, detecção de bots e emuladores, reputação de rede e motor de score de risco para checkouts.
+      </p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-device')">
+        <i class="fas fa-fingerprint"></i> Meu Dispositivo (Live Scanner)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-simulador')">
+        <i class="fas fa-shield-halved"></i> Simulador de Risco de Checkout
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-docs')">
+        <i class="fas fa-code"></i> SDK &amp; Integração
+      </button>
+    </div>
+
+    <!-- ═════════ ABA 1: MEU DISPOSITIVO AO VIVO ═════════ -->
+    <div id="tab-device" class="tab-content active">
+      <div class="card">
+        <div class="card-title">
+          <i class="fas fa-id-card-clip" style="color:var(--primary)"></i>
+          <span>Identidade Digital da Máquina (Device Fingerprint)</span>
+        </div>
+        <p class="card-desc">
+          Este identificador é calculado matematicamente a partir de atributos físicos e lógicos da sua máquina sem nenhum cookie ou armazenamento invasivo.
+        </p>
+
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="stat-box" style="border-left:4px solid var(--primary)">
+            <div class="stat-label"><i class="fas fa-fingerprint"></i> Device ID Determinístico</div>
+            <div class="stat-val" id="dispDeviceId" style="color:var(--primary);font-family:'JetBrains Mono'">Coletando sinais...</div>
+          </div>
+          <div class="stat-box" style="border-left:4px solid var(--accent)">
+            <div class="stat-label"><i class="fas fa-cube"></i> Device UUID (Padrão v5)</div>
+            <div class="stat-val" id="dispDeviceUuid" style="color:var(--accent);font-family:'JetBrains Mono'">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="grid-4">
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-microchip"></i> CPUs / Memória</div>
+            <div class="stat-val" id="dispCpuMem">--</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-display"></i> Tela &amp; Cores</div>
+            <div class="stat-val" id="dispTela">--</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-palette"></i> Canvas Signature</div>
+            <div class="stat-val" id="dispCanvas" style="font-family:'JetBrains Mono'">--</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-robot"></i> Detecção de Robô</div>
+            <div class="stat-val" id="dispBot">Humano / Real</div>
+          </div>
+        </div>
+
+        <div class="stat-box" style="margin-bottom:20px">
+          <div class="stat-label"><i class="fas fa-vr-cardboard"></i> GPU / Renderizador WebGL</div>
+          <div class="stat-val" id="dispGpu" style="font-size:0.92rem;color:var(--text-muted)">--</div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div style="font-size:0.85rem;color:var(--text-muted)">
+            <i class="fas fa-check-circle" style="color:var(--primary)"></i> Conformidade estrita com o Art. 7º da LGPD.
+          </div>
+          <button class="btn-action" onclick="escanearNovamente()">
+            <i class="fas fa-arrows-rotate"></i> Re-escanear Dispositivo
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ ABA 2: SIMULADOR DE CHECKOUT ═════════ -->
+    <div id="tab-simulador" class="tab-content">
+      <div class="card">
+        <div class="card-title">
+          <i class="fas fa-calculator" style="color:var(--primary)"></i>
+          <span>Motor de Pontuação de Risco (Score 0 a 100)</span>
+        </div>
+        <p class="card-desc">
+          Simule transações e cadastros para ver como o algoritmo cruza documentos, e-mails, DDDs, redes e sinais de bot.
+        </p>
+
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:0.82rem;font-weight:700;color:var(--text-muted)">Cenários de Teste:</span>
+          <button class="preset-btn" onclick="aplicarCenario('legitimo')">🟢 1. Compra Legítima</button>
+          <button class="preset-btn" onclick="aplicarCenario('divergencia')">🟡 2. DDD Divergente de IP</button>
+          <button class="preset-btn" onclick="aplicarCenario('tempmail')">🟠 3. E-mail Descartável</button>
+          <button class="preset-btn" onclick="aplicarCenario('fraude')">🔴 4. Ataque de Bot / Card Testing</button>
+        </div>
+
+        <div class="grid-2">
+          <!-- Coluna Formulário -->
+          <div>
+            <div class="input-group">
+              <label>Valor da Transação (R$)</label>
+              <input type="number" id="simValor" value="249.90" step="0.01">
+            </div>
+            <div class="input-group">
+              <label>CPF ou CNPJ do Comprador</label>
+              <input type="text" id="simCpf" value="52998224725">
+            </div>
+            <div class="input-group">
+              <label>E-mail do Cliente</label>
+              <input type="email" id="simEmail" value="cliente.legitimo@gmail.com">
+            </div>
+            <div class="input-group">
+              <label>Telefone / WhatsApp</label>
+              <input type="text" id="simTelefone" value="(11) 98765-4321">
+            </div>
+
+            <div class="grid-2">
+              <div class="input-group">
+                <label>UF do IP de Conexão</label>
+                <select id="simUfIp">
+                  <option value="SP" selected>SP - São Paulo</option>
+                  <option value="RJ">RJ - Rio de Janeiro</option>
+                  <option value="MG">MG - Minas Gerais</option>
+                  <option value="AM">AM - Amazonas</option>
+                  <option value="RS">RS - Rio Grande do Sul</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Tipo de Conexão / Rede</label>
+                <select id="simTipoRede">
+                  <option value="residencial" selected>Provedor Residencial (Claro, Vivo)</option>
+                  <option value="datacenter">Datacenter / VPS (AWS, GCP, Linode)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="input-group" style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <input type="checkbox" id="simBotCheck" style="width:18px;height:18px">
+              <label for="simBotCheck" style="margin:0;cursor:pointer">Simular Navegador Automatizado / Headless (Puppeteer/Selenium)</label>
+            </div>
+
+            <button class="btn-action" style="width:100%;margin-top:10px" onclick="calcularRisco()">
+              <i class="fas fa-shield-halved"></i> Avaliar Risco da Transação
+            </button>
+          </div>
+
+          <!-- Coluna Resultado -->
+          <div>
+            <div class="score-container" id="painelScore">
+              <div class="score-circle" id="circuloScore">
+                <div class="score-number" id="txtScore">0</div>
+                <div class="score-max">/ 100</div>
+              </div>
+              <div style="font-size:1.15rem;font-weight:800;margin-bottom:4px" id="txtNivel">RISCO BAIXO</div>
+              <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px" id="txtRecomendacao">Recomendação: Aprovar Automaticamente</div>
+              <div style="width:100%;text-align:left">
+                <div style="font-size:0.8rem;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:8px">
+                  Fatores de Auditoria Acionados:
+                </div>
+                <div id="listaFatores">
+                  <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:12px">Nenhum fator de risco detectado.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ ABA 3: INTEGRAÇÃO & SDK ═════════ -->
+    <div id="tab-docs" class="tab-content">
+      <div class="card">
+        <div class="card-title">
+          <i class="fas fa-terminal" style="color:var(--accent)"></i>
+          <span>Como Integrar no seu Checkout ou Backend em 3 Linhas</span>
+        </div>
+        <p class="card-desc">
+          Disponível como pacote NPM com zero dependências e como endpoint REST Anycast Edge.
+        </p>
+
+        <div style="margin-bottom:20px">
+          <label>1. Instalação via NPM</label>
+          <div class="code-box">npm install antifraude-pro</div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <label>2. Exemplo no Checkout (JavaScript / Frontend)</label>
+          <div class="code-box">import { AntiFraudePro } from 'antifraude-pro';
+
+// 1. Coleta instantânea de sinais em memória (0ms de latência)
+const sinais = await AntiFraudePro.coletarSinaisNavegador();
+const { deviceId } = AntiFraudePro.gerarDeviceId(sinais);
+
+// 2. Envia para sua API de pagamento com o payload
+fetch('/api/checkout', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    valor: 149.90,
+    cpf: '52998224725',
+    email: 'cliente@gmail.com',
+    deviceId,
+    sinais
+  })
+});</div>
+        </div>
+
+        <div>
+          <label>3. Chamada via API REST Edge (Cloudflare Anycast)</label>
+          <div class="code-box">curl -X POST "https://ponte.ozpro.com.br/api/antifraude/analisar" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "valor": 120.00,
+    "cpf": "52998224725",
+    "email": "contato@empresa.com",
+    "telefone": "11987654321"
+  }'</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { AntiFraudePro } from './antifraude-pro.js';
+
+    window.AntiFraudePro = AntiFraudePro;
+
+    window.switchTab = function(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    };
+
+    async function carregarDevice() {
+      try {
+        const sinais = await AntiFraudePro.coletarSinaisNavegador();
+        const dev = AntiFraudePro.gerarDeviceId(sinais);
+        
+        document.getElementById('dispDeviceId').innerText = dev.deviceId.slice(0, 32) + '...';
+        document.getElementById('dispDeviceId').title = dev.deviceId;
+        document.getElementById('dispDeviceUuid').innerText = dev.deviceUuid;
+
+        const hw = sinais.hardware || {};
+        const sc = sinais.tela || {};
+        document.getElementById('dispCpuMem').innerText = `${hw.concorrenciaCpus || 4} CPUs / ${hw.memoriaGb || 8} GB RAM`;
+        document.getElementById('dispTela').innerText = `${sc.largura}x${sc.altura} (${sc.profundidadeCores}-bit)`;
+        document.getElementById('dispCanvas').innerText = sinais.hashes.canvas || 'Ativo';
+        
+        const isBot = sinais.seguranca.isHeadless || sinais.seguranca.isWebdriver;
+        const botEl = document.getElementById('dispBot');
+        if (isBot) {
+          botEl.innerText = '⚠️ Robô / Bot Detectado';
+          botEl.style.color = 'var(--danger)';
+        } else {
+          botEl.innerText = '🟢 Humano Confiável';
+          botEl.style.color = 'var(--primary)';
+        }
+
+        document.getElementById('dispGpu').innerText = sinais.hashes.webglRenderer || 'Desconhecido';
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    window.escanearNovamente = function() {
+      document.getElementById('dispDeviceId').innerText = 'Recalculando...';
+      carregarDevice();
+    };
+
+    window.aplicarCenario = function(tipo) {
+      if (tipo === 'legitimo') {
+        document.getElementById('simValor').value = '249.90';
+        document.getElementById('simCpf').value = '52998224725';
+        document.getElementById('simEmail').value = 'cliente.legitimo@gmail.com';
+        document.getElementById('simTelefone').value = '(11) 98765-4321';
+        document.getElementById('simUfIp').value = 'SP';
+        document.getElementById('simTipoRede').value = 'residencial';
+        document.getElementById('simBotCheck').checked = false;
+      } else if (tipo === 'divergencia') {
+        document.getElementById('simValor').value = '350.00';
+        document.getElementById('simCpf').value = '52998224725';
+        document.getElementById('simEmail').value = 'marcos.silva@outlook.com';
+        document.getElementById('simTelefone').value = '(92) 98111-2233'; // AM
+        document.getElementById('simUfIp').value = 'SP'; // SP vs AM
+        document.getElementById('simTipoRede').value = 'residencial';
+        document.getElementById('simBotCheck').checked = false;
+      } else if (tipo === 'tempmail') {
+        document.getElementById('simValor').value = '89.90';
+        document.getElementById('simCpf').value = '52998224725';
+        document.getElementById('simEmail').value = 'comprador@yopmail.com';
+        document.getElementById('simTelefone').value = '(11) 98765-4321';
+        document.getElementById('simUfIp').value = 'SP';
+        document.getElementById('simTipoRede').value = 'residencial';
+        document.getElementById('simBotCheck').checked = false;
+      } else if (tipo === 'fraude') {
+        document.getElementById('simValor').value = '0.75';
+        document.getElementById('simCpf').value = '11111111111';
+        document.getElementById('simEmail').value = 'suamaeaquelaursa@tempmail.com';
+        document.getElementById('simTelefone').value = '(92) 99999-9999';
+        document.getElementById('simUfIp').value = 'RS';
+        document.getElementById('simTipoRede').value = 'datacenter';
+        document.getElementById('simBotCheck').checked = true;
+      }
+      calcularRisco();
+    };
+
+    window.calcularRisco = function() {
+      const transacao = {
+        valor: document.getElementById('simValor').value,
+        cpf: document.getElementById('simCpf').value,
+        email: document.getElementById('simEmail').value,
+        telefone: document.getElementById('simTelefone').value
+      };
+
+      const contexto = {
+        estado: document.getElementById('simUfIp').value,
+        isDatacenter: document.getElementById('simTipoRede').value === 'datacenter',
+        provedor: document.getElementById('simTipoRede').value === 'datacenter' ? 'Amazon AWS Datacenter' : 'Claro Brasil',
+        isHeadless: document.getElementById('simBotCheck').checked
+      };
+
+      const res = AntiFraudePro.avaliarTransacao(transacao, contexto);
+
+      const circle = document.getElementById('circuloScore');
+      const txtScore = document.getElementById('txtScore');
+      const txtNivel = document.getElementById('txtNivel');
+      const txtRec = document.getElementById('txtRecomendacao');
+      const listaFatores = document.getElementById('listaFatores');
+
+      txtScore.innerText = res.scoreRisco;
+      circle.style.borderColor = res.corBadge;
+      circle.style.boxShadow = `0 0 25px ${res.corBadge}40`;
+      txtScore.style.color = res.corBadge;
+      txtNivel.style.color = res.corBadge;
+      txtNivel.innerText = `RISCO ${res.nivelRisco.toUpperCase()}`;
+
+      if (res.recomendacao === 'aprovar') {
+        txtRec.innerText = 'Recomendação: Aprovar Automaticamente 🟢';
+      } else if (res.recomendacao === 'desafio_2fa') {
+        txtRec.innerText = 'Recomendação: Exigir Confirmação 2FA / WhatsApp 🟡';
+      } else if (res.recomendacao === 'analise_manual') {
+        txtRec.innerText = 'Recomendação: Encaminhar para Análise Manual 🟠';
+      } else {
+        txtRec.innerText = 'Recomendação: BLOQUEAR TRANSAÇÃO IMEDIATAMENTE 🔴';
+      }
+
+      if (res.fatoresRisco.length === 0) {
+        listaFatores.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:12px">Nenhum fator de risco detectado. Perfil seguro.</div>';
+      } else {
+        listaFatores.innerHTML = res.fatoresRisco.map(f => `
+          <div class="factor-item">
+            <span>${f.descricao}</span>
+            <span class="factor-peso">+${f.peso} pts</span>
+          </div>
+        `).join('');
+      }
+    };
+
+    // Inicialização
+    carregarDevice();
+    calcularRisco();
+  </script>
+</body>
+</html>

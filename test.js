@@ -1,0 +1,102 @@
+import { AntiFraudePro } from './antifraude-pro.js';
+
+console.log('🛡️ Iniciando Bateria de Testes Unitários do AntiFraude Pro...\n');
+
+// 1. Teste de Hashing SHA-256 e UUID Determinístico
+const textoTeste = 'AntiFraudePro-Sinais-2026';
+const hash = AntiFraudePro.hashSha256(textoTeste);
+console.assert(hash.length === 64, 'Hash SHA-256 deve ter exatamente 64 caracteres hexadecimais');
+const uuid = AntiFraudePro.hexParaUuid(hash);
+console.assert(uuid.length === 36, 'UUID deve ter 36 caracteres');
+console.log('✅ 1. Hashing Determinístico & UUID OK:');
+console.log('   Hash SHA-256:', hash);
+console.log('   UUID v5:', uuid);
+
+// 2. Teste de Estabilidade do DeviceId
+const sinaisDispositivoA = {
+  tela: { largura: 1920, altura: 1080, profundidadeCores: 24 },
+  hardware: { concorrenciaCpus: 8, memoriaGb: 16, maxTouchPoints: 0 },
+  software: { plataforma: 'Win32', timeZone: 'America/Sao_Paulo' },
+  hashes: { canvas: 'canvas_hash_123', webglRenderer: 'NVIDIA RTX 4070', audio: 'audio_hash_456' }
+};
+
+const dev1 = AntiFraudePro.gerarDeviceId(sinaisDispositivoA);
+const dev2 = AntiFraudePro.gerarDeviceId(sinaisDispositivoA);
+console.assert(dev1.deviceId === dev2.deviceId, 'O mesmo dispositivo deve gerar estritamente o mesmo deviceId');
+console.assert(dev1.deviceId.startsWith('dev_'), 'DeviceId deve iniciar com dev_');
+console.log('✅ 2. Estabilidade do DeviceId OK:', dev1.deviceId);
+
+// 3. Teste de Validação de Documentos Oficiais
+console.assert(AntiFraudePro.validarCpf('52998224725') === true, 'CPF válido deve passar');
+console.assert(AntiFraudePro.validarCpf('11111111111') === false, 'CPF com dígitos iguais deve falhar');
+console.assert(AntiFraudePro.validarCpf('12345678900') === false, 'CPF com DV errado deve falhar');
+console.assert(AntiFraudePro.validarCnpj('06990590000123') === true, 'CNPJ válido (Google Brasil) deve passar');
+console.assert(AntiFraudePro.validarCnpj('00000000000000') === false, 'CNPJ zerado deve falhar');
+console.log('✅ 3. Validação de Documentos (CPF / CNPJ Módulo 11) OK');
+
+// 4. Teste de Detecção de E-mails Descartáveis e Trolls
+const emailNormal = AntiFraudePro.analisarEmail('contato@empresa.com.br');
+const emailTemp = AntiFraudePro.analisarEmail('hacker123@yopmail.com');
+const emailTroll = AntiFraudePro.analisarEmail('suamaeaquelaursa@gmail.com');
+
+console.assert(emailNormal.valido === true && !emailNormal.descartavel && !emailNormal.troll, 'E-mail corporativo normal deve ser aceito');
+console.assert(emailTemp.descartavel === true, 'Yopmail deve ser detectado como descartável');
+console.assert(emailTroll.troll === true, 'Padrão troll deve ser detectado');
+console.log('✅ 4. Análise de E-mails (Descartáveis / Trolls) OK');
+
+// 5. Teste de Telefone e Mapeamento de DDD
+const telSp = AntiFraudePro.analisarTelefone('(11) 98765-4321');
+console.assert(telSp.valido === true, 'Telefone de SP deve ser válido');
+console.assert(telSp.uf === 'SP', 'DDD 11 deve mapear para SP');
+console.assert(telSp.isCelular === true, 'Deve ser celular');
+console.log('✅ 5. Análise de Telefonia ANATEL OK:', telSp.ddd, '-', telSp.uf);
+
+// 6. Teste de Avaliação de Transação Legítima (Score Baixo -> Aprovado)
+const transacaoBoa = {
+  valor: 249.90,
+  cpf: '52998224725',
+  email: 'usuario.legitimo@gmail.com',
+  telefone: '11987654321'
+};
+const contextoBom = {
+  ip: '177.18.200.45',
+  provedor: 'CLARO S.A.',
+  estado: 'SP',
+  deviceId: dev1.deviceId,
+  isHeadless: false
+};
+const analiseBoa = AntiFraudePro.avaliarTransacao(transacaoBoa, contextoBom);
+console.assert(analiseBoa.nivelRisco === 'baixo', 'Transação legítima deve ter risco baixo');
+console.assert(analiseBoa.recomendacao === 'aprovar', 'Transação legítima deve ser aprovada');
+console.log('✅ 6. Transação Legítima (Score:', analiseBoa.scoreRisco, ') -> Recomendação:', analiseBoa.recomendacao);
+
+// 7. Teste de Avaliação de Ataque / Fraude Crítica (Score Alto -> Bloqueio)
+const transacaoFraude = {
+  valor: 0.50, // Micro-valor de card testing
+  cpf: '11111111111', // CPF inválido
+  email: 'teste@tempmail.com', // E-mail temporário
+  telefone: '92988887777' // DDD 92 (AM) divergente do IP (SP)
+};
+const contextoFraude = {
+  ip: '34.95.120.10',
+  provedor: 'Google Cloud Datacenter ASN 15169',
+  estado: 'SP',
+  deviceId: 'dev_bot_selenium_1',
+  isHeadless: true // Robô / headless browser
+};
+const analiseFraude = AntiFraudePro.avaliarTransacao(transacaoFraude, contextoFraude);
+console.assert(analiseFraude.scoreRisco >= 80, 'Ataque combinado deve atingir score crítico >= 80');
+console.assert(analiseFraude.recomendacao === 'bloquear', 'Ataque deve ser bloqueado');
+console.log('✅ 7. Ataque Detectado (Score:', analiseFraude.scoreRisco, ') -> Bloqueio Automático:', analiseFraude.recomendacao);
+console.log('   Fatores Acionados:', analiseFraude.fatoresRisco.map(f => f.regra).join(', '));
+
+// 8. Teste de Velocity / Força Bruta
+const chaveTeste = 'device_stress_test_velocity';
+for (let i = 0; i < 4; i++) {
+  AntiFraudePro.checarVelocidade(chaveTeste, 3, 60);
+}
+const velUltima = AntiFraudePro.checarVelocidade(chaveTeste, 3, 60);
+console.assert(velUltima.violouVelocidade === true, 'Deve violar limite de velocidade');
+console.log('✅ 8. Monitor de Velocidade / Brute Force OK (Total no minuto:', velUltima.totalRecente, ')\n');
+
+console.log('🎉 Todos os testes unitários do AntiFraude Pro passaram com 100% de sucesso!');

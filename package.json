@@ -1,0 +1,39 @@
+{
+  "name": "antifraude-pro",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SDK e API Oficial de Segurança, Detecção de Fraudes, Device Fingerprint Determinístico (Sem Cookies / LGPD Compliant), Score de Risco de Transações (0-100) e Proteção Anti-Bot na Cloudflare Edge (<2ms).",
+  "main": "antifraude-pro.js",
+  "module": "antifraude-pro.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test": "node test.js",
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [
+    "antifraude",
+    "anti-fraude",
+    "device-fingerprint",
+    "fraud-detection",
+    "risk-score",
+    "anti-bot",
+    "headless-detection",
+    "cybersecurity",
+    "lgpd",
+    "checkout-protection",
+    "cloudflare-worker",
+    "edge-computing",
+    "brasil",
+    "fintech"
+  ],
+  "author": "clepta2 <clepta2@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clepta2/antifraude-pro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/clepta2/antifraude-pro/issues"
+  },
+  "homepage": "https://github.com/clepta2/antifraude-pro#readme"
+}
