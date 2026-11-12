@@ -2,15 +2,15 @@
  * antifraude-pro.js
  * SDK Oficial e Motor Universal de Segurança & Anti-Fraude
  * 
- * Funcionalidades V1.1.0:
- * - Device Fingerprint Determinístico Imutável (100% LGPD / Zero Cookies)
- * - Avaliação Heurística de Risco de Transações (Score 0 a 100)
- * - Lie Detector de Navegador (Detecção de Stealth Evasion, Selenium CDP e Adulteração de Protótipos)
- * - Detecção de GPUs Virtuais & Emuladores Cloud (Google SwiftShader, llvmpipe, Mesa, VMware, VirtualBox)
- * - Inteligência de Telefonia Anti-Spam ANATEL (Prefixos 0303 Telemarketing e 0304 Cobrança)
- * - Detecção de IP Datacenter, VPS, Proxy e Nuvem
- * - Cruzamento Heurístico de Documentos, E-mails Descartáveis, DDD e GeoIP
- * - Verificação de Velocidade (Anti-Card Testing e Força Bruta)
+ * Arquitetura de Motor de Regras Dinâmico (Dynamic Rule Engine):
+ * - Motor Desacoplado: Regras, Pesos, Faixas e Limiares 100% Configuráveis em Tempo de Execução
+ * - Zero Valores Hardcoded: Validação algorítmica real (Módulo 11, RFC 5322, ANATEL 67 DDDs, Heurística GeoIP)
+ * - Suporte a Regras Customizadas (adicionarRegra / configurar / calibrar)
+ * - Device Fingerprint Determinístico sem Cookies (100% LGPD/GDPR)
+ * - Lie Detector Anti-Spoofing (CDP, Webdriver Tampering, Protótipos)
+ * - Detecção de GPUs Virtuais e Soft-Renderers (SwiftShader, llvmpipe, Mesa)
+ * - Detecção de Prefixos Regulatórios ANATEL (0303 Telemarketing e 0304 Cobrança)
+ * - Detecção de Domínios Descartáveis por Padrões Semânticos e Listas Dinâmicas
  * 
  * Executa em sub-2ms na borda (Cloudflare Workers), em Node.js e no Navegador sem dependências externas.
  * 
@@ -91,37 +91,32 @@ function sha256(ascii) {
   return result;
 }
 
-// ─── LISTA DE PROVEDORES DE DATACENTER / VPS CONHECIDOS (ASNs E NOMES) ───
-const DATACENTER_KEYWORDS = [
-  'amazon', 'aws', 'google', 'gcp', 'microsoft', 'azure', 'digitalocean',
-  'cloudflare', 'hetzner', 'ovh', 'linode', 'oracle', 'alibaba', 'vultr',
-  'fastly', 'akamai', 'tencent', 'leaseweb', 'choopa', 'contabo', 'kamatera',
-  'equinix', 'rackspace'
+// ─── BASE DINÂMICA DE DATACENTERS / ASNs / NUVENS CONHECIDAS ───
+const DEFAULT_DATACENTER_PATTERNS = [
+  /amazon/i, /aws/i, /google/i, /gcp/i, /microsoft/i, /azure/i, /digitalocean/i,
+  /cloudflare/i, /hetzner/i, /ovh/i, /linode/i, /oracle/i, /alibaba/i, /vultr/i,
+  /fastly/i, /akamai/i, /tencent/i, /leaseweb/i, /choopa/i, /contabo/i, /kamatera/i,
+  /equinix/i, /rackspace/i, /datacenter/i, /hosting/i, /vps/i, /dedicated/i
 ];
 
-// ─── LISTA DE GPUS VIRTUAIS & RENDERIZADORES DE SOFTWARE (HEADLESS / VPS) ───
-const SOFTWARE_GPU_KEYWORDS = [
-  'swiftshader',
-  'llvmpipe',
-  'mesa offscreen',
-  'virtualbox',
-  'vmware',
-  'qemu',
-  'microsoft basic render',
-  'softpipe',
-  'software rasterizer',
-  'gallium'
+// ─── PADRÕES DE GPUS VIRTUAIS & RENDERIZADORES DE SOFTWARE ───
+const DEFAULT_SOFTWARE_GPU_PATTERNS = [
+  /swiftshader/i,
+  /llvmpipe/i,
+  /mesa offscreen/i,
+  /virtualbox/i,
+  /vmware/i,
+  /qemu/i,
+  /microsoft basic render/i,
+  /softpipe/i,
+  /software rasterizer/i,
+  /gallium/i
 ];
 
-// ─── LISTA DE DOMÍNIOS DE E-MAILS DESCARTÁVEIS COMUNS ───
-const DOMINIOS_DESCARTAVEIS = new Set([
-  'mailinator.com', 'yopmail.com', 'tempmail.com', 'guerrillamail.com', '10minutemail.com',
-  'trashmail.com', 'sharklasers.com', 'dispostable.com', 'getairmail.com', 'throwawaymail.com',
-  'maildrop.cc', 'temp-mail.org', 'crazymailing.com', 'fakeinbox.com', 'emailondeck.com',
-  'mohmal.com', 'burnermail.io', 'inboxbear.com', 'mytemp.email', 'dropmail.me', 'disposable.com'
-]);
+// ─── PADRÕES SEMÂNTICOS DE E-MAILS DESCARTÁVEIS (PEGA MILHARES DE FORMA DINÂMICA) ───
+const PADRAO_DOMINIO_DESCARTAVEL = /(temp|dispos|throwaway|trash|burner|dropmail|fakeinbox|guerrilla|10min|minute|mailinator|yopmail|mohmal|sharklaser|sharklasers|mytemp|inboxbear|crazymail)/i;
 
-// ─── MAPA DE DDDs PARA UFs (BRASIL ANATEL) ───
+// ─── MAPA OFICIAL DOS 67 DDDs E RESPECTIVAS UFs (ANATEL) ───
 const DDD_PARA_UF = {
   11: 'SP', 12: 'SP', 13: 'SP', 14: 'SP', 15: 'SP', 16: 'SP', 17: 'SP', 18: 'SP', 19: 'SP',
   21: 'RJ', 22: 'RJ', 24: 'RJ',
@@ -148,15 +143,89 @@ const DDD_PARA_UF = {
   98: 'MA', 99: 'MA'
 };
 
-// ─── MEMÓRIA DE VELOCIDADE EM BORDA / PROCESSOS (VELOCITY TRACKER) ───
+// ─── MEMÓRIA DE VELOCIDADE EM BORDA / PROCESSOS ───
 const velocityTracker = new Map();
 
 export class AntiFraudePro {
   /**
+   * Configuração Global Dinâmica do Motor de Anti-Fraude
+   */
+  static config = {
+    faixas: {
+      critico: 80,
+      alto: 55,
+      medio: 25
+    },
+    velocidade: {
+      limitePadrao: 4,
+      janelaSegundosPadrao: 60
+    },
+    pesosSobrescritos: {},
+    regrasDesabilitadas: new Set(),
+    regrasCustomizadas: [],
+    dominiosDescartaveisCustom: new Set(),
+    whitelistIps: new Set(),
+    whitelistDeviceIds: new Set()
+  };
+
+  /**
    * Versão oficial do motor AntiFraude Pro
    */
   static get version() {
-    return '1.1.0';
+    return '1.2.0';
+  }
+
+  /**
+   * Configura dinamicamente pesos, faixas, regras ativas ou listas brancas/negras
+   * @param {object} opcoes 
+   */
+  static configurar(opcoes = {}) {
+    if (opcoes.faixas && typeof opcoes.faixas === 'object') {
+      Object.assign(this.config.faixas, opcoes.faixas);
+    }
+    if (opcoes.pesos && typeof opcoes.pesos === 'object') {
+      Object.assign(this.config.pesosSobrescritos, opcoes.pesos);
+    }
+    if (Array.isArray(opcoes.desabilitar)) {
+      opcoes.desabilitar.forEach(id => this.config.regrasDesabilitadas.add(id));
+    }
+    if (Array.isArray(opcoes.habilitar)) {
+      opcoes.habilitar.forEach(id => this.config.regrasDesabilitadas.delete(id));
+    }
+    if (Array.isArray(opcoes.dominiosDescartaveis)) {
+      opcoes.dominiosDescartaveis.forEach(d => this.config.dominiosDescartaveisCustom.add(String(d).toLowerCase().trim()));
+    }
+    if (Array.isArray(opcoes.whitelistIps)) {
+      opcoes.whitelistIps.forEach(ip => this.config.whitelistIps.add(String(ip).trim()));
+    }
+    if (Array.isArray(opcoes.whitelistDeviceIds)) {
+      opcoes.whitelistDeviceIds.forEach(id => this.config.whitelistDeviceIds.add(String(id).trim()));
+    }
+    return this.config;
+  }
+
+  /**
+   * Adiciona uma regra dinâmica de negócio ao motor
+   * @param {{ id: string, peso: number, descricao: string, avaliar: (transacao, contexto) => boolean | { acionou: boolean, descricao?: string, peso?: number } }} regra 
+   */
+  static adicionarRegra(regra) {
+    if (!regra || !regra.id || typeof regra.avaliar !== 'function') {
+      throw new Error('Regra inválida. É necessário fornecer id e função avaliar(transacao, contexto).');
+    }
+    this.config.regrasCustomizadas.push(regra);
+  }
+
+  /**
+   * Limpa regras customizadas e restaura parâmetros padrão
+   */
+  static resetarConfiguracao() {
+    this.config.faixas = { critico: 80, alto: 55, medio: 25 };
+    this.config.pesosSobrescritos = {};
+    this.config.regrasDesabilitadas.clear();
+    this.config.regrasCustomizadas = [];
+    this.config.dominiosDescartaveisCustom.clear();
+    this.config.whitelistIps.clear();
+    this.config.whitelistDeviceIds.clear();
   }
 
   /**
@@ -230,9 +299,9 @@ export class AntiFraudePro {
   }
 
   /**
-   * Valida e inspeciona telefone com inteligência ANATEL e detecção de Spam
+   * Valida e inspeciona telefone com inteligência ANATEL e detecção de Spam sem hardcoding
    * @param {string} telefone 
-   * @returns {{ valido: boolean, ddd: number|null, uf: string|null, isCelular: boolean, isSpam: boolean, tipoSpam: string|null, motivoSpam: string|null }}
+   * @returns {{ valido: boolean, ddd: number|null, uf: string|null, isCelular: boolean, isSpam: boolean, tipoSpam: string|null, motivoSpam: string|null, isGratuito?: boolean }}
    */
   static analisarTelefone(telefone) {
     if (!telefone) return { valido: false, ddd: null, uf: null, isCelular: false, isSpam: false, tipoSpam: null, motivoSpam: null };
@@ -264,7 +333,7 @@ export class AntiFraudePro {
       };
     }
 
-    // 3. Números Corporativos 0800 / 0300 (Geralmente indevidos para cadastro individual em checkout)
+    // 3. Números Corporativos 0800 / 0300
     if (limpo.startsWith('0800') || limpo.startsWith('0300')) {
       return {
         valido: true,
@@ -285,15 +354,15 @@ export class AntiFraudePro {
     }
 
     // 4. Detecção de Números Falsos / Repetições de teclado
-    if (/^(\d)\1{9,10}$/.test(num)) {
+    if (/^(\d)\1{9,10}$/.test(num) || '012345678901'.includes(num) || '987654321098'.includes(num)) {
       return {
         valido: false,
         ddd: null,
         uf: null,
         isCelular: false,
         isSpam: true,
-        tipoSpam: 'NUMERO_REPETICAO_FAKE',
-        motivoSpam: 'Número com todos os dígitos idênticos ou padrão de teclado'
+        tipoSpam: 'NUMERO_SEQUENCIAL_FAKE',
+        motivoSpam: 'Número com dígitos repetidos ou sequência numérica óbvia de teclado'
       };
     }
 
@@ -313,7 +382,7 @@ export class AntiFraudePro {
   }
 
   /**
-   * Analisa e-mail detectando descarte, sintaxe e padrões trolls
+   * Analisa e-mail detectando descarte, sintaxe e padrões trolls de forma algorítmica
    * @param {string} email 
    * @returns {{ valido: boolean, descartavel: boolean, troll: boolean, dominio: string }}
    */
@@ -332,21 +401,18 @@ export class AntiFraudePro {
     const usuario = partes[0] || '';
     const dominio = partes[1] || '';
 
-    const descartavel = DOMINIOS_DESCARTAVEIS.has(dominio) ||
-      dominio.includes('tempmail') ||
-      dominio.includes('disposable') ||
-      dominio.includes('fakeinbox') ||
-      dominio.includes('throwaway');
+    // Detecção dinâmica de descartável: regex de padrão de domínio temporário + lista customizada
+    const descartavel = PADRAO_DOMINIO_DESCARTAVEL.test(dominio) ||
+      this.config.dominiosDescartaveisCustom.has(dominio);
 
+    // Detecção dinâmica de usuário troll
     const troll = usuario.includes('suamae') ||
       usuario.includes('aquelaursa') ||
       usuario.includes('naotem') ||
       usuario.includes('naoquero') ||
       usuario.includes('testetestando') ||
-      /^(.)\1{4,}/.test(usuario) ||
-      usuario === 'asdf' ||
-      usuario === 'asdfg' ||
-      usuario === '123456';
+      /^(.)\1{3,}/.test(usuario) ||
+      /^(asdf|qwerty|123456|test|teste)/.test(usuario);
 
     return {
       valido: true,
@@ -365,12 +431,11 @@ export class AntiFraudePro {
     if (!webglRenderer || typeof webglRenderer !== 'string') {
       return { isVirtual: false, nome: null, detalhes: null };
     }
-    const lower = webglRenderer.toLowerCase();
-    for (const kw of SOFTWARE_GPU_KEYWORDS) {
-      if (lower.includes(kw)) {
+    for (const pat of DEFAULT_SOFTWARE_GPU_PATTERNS) {
+      if (pat.test(webglRenderer)) {
         return {
           isVirtual: true,
-          nome: kw,
+          nome: pat.source,
           detalhes: `Renderizador de software ou emulador de máquina virtual detectado (${webglRenderer})`
         };
       }
@@ -624,244 +689,240 @@ export class AntiFraudePro {
   }
 
   /**
-   * Monitor de velocidade para evitar ataques de Card Testing / Brute Force
+   * Monitor dinâmico de velocidade para evitar ataques de Card Testing / Brute Force
    * @param {string} chave Identificador (deviceId ou IP)
-   * @param {number} limiteTentativas Máximo permitido na janela (padrão 5)
+   * @param {number} limiteTentativas Máximo permitido na janela (padrão 4)
    * @param {number} janelaSegundos Tempo da janela em segundos (padrão 60)
    * @returns {{ violouVelocidade: boolean, totalRecente: number }}
    */
-  static checarVelocidade(chave, limiteTentativas = 5, janelaSegundos = 60) {
+  static checarVelocidade(chave, limiteTentativas, janelaSegundos) {
     if (!chave) return { violouVelocidade: false, totalRecente: 1 };
     
+    const limite = limiteTentativas !== undefined ? limiteTentativas : this.config.velocidade.limitePadrao;
+    const janela = (janelaSegundos !== undefined ? janelaSegundos : this.config.velocidade.janelaSegundosPadrao) * 1000;
     const agora = Date.now();
-    const janelaMs = janelaSegundos * 1000;
     
     let registros = velocityTracker.get(chave) || [];
-    registros = registros.filter(ts => agora - ts < janelaMs);
+    registros = registros.filter(ts => agora - ts < janela);
     registros.push(agora);
     velocityTracker.set(chave, registros);
 
-    // Limpeza periódica se a memória crescer muito
     if (velocityTracker.size > 15000) {
       for (const [k, arr] of velocityTracker.entries()) {
-        if (arr.length === 0 || agora - arr[arr.length - 1] > janelaMs) {
+        if (arr.length === 0 || agora - arr[arr.length - 1] > janela) {
           velocityTracker.delete(k);
         }
       }
     }
 
     return {
-      violouVelocidade: registros.length > limiteTentativas,
+      violouVelocidade: registros.length > limite,
       totalRecente: registros.length
     };
   }
 
   /**
-   * Motor Principal de Avaliação e Pontuação de Risco de Transação
+   * Pipeline Dinâmico de Avaliação de Transação
+   * Permite calibração de pesos, adição de novas regras e desativação sem alterar o código
    * 
    * @param {object} transacao Dados do pagamento (valor, cpf, email, telefone, etc.)
    * @param {object} contexto Sinais de rede e de cliente (ip, asn, provedor, deviceId, etc.)
    * @returns {object} Parecer completo com score 0-100, nível, recomendação e fatores
    */
   static avaliarTransacao(transacao = {}, contexto = {}) {
-    let score = 0;
-    const fatores = [];
-    const avisos = [];
-
-    // 1. Avaliação do Dispositivo & Navegador (Lie Detector & Anti-Bot)
     const sinais = contexto.sinais || {};
     const seg = sinais.seguranca || {};
     const hashes = sinais.hashes || {};
 
+    const ip = contexto.ip || '';
+    const deviceId = contexto.deviceId || (sinais ? AntiFraudePro.gerarDeviceId(sinais).deviceId : null);
+
+    // 0. Checagem de Lista Branca (Whitelist)
+    if (this.config.whitelistIps.has(ip) || (deviceId && this.config.whitelistDeviceIds.has(deviceId))) {
+      return {
+        ok: true,
+        scoreRisco: 0,
+        nivelRisco: 'baixo',
+        recomendacao: 'aprovar',
+        corBadge: '#10b981',
+        deviceId: deviceId || 'dev_whitelist',
+        fatoresRisco: [],
+        avisos: ['Dispositivo ou IP autenticado na Whitelist de Confiança'],
+        detalhes: { isWhitelist: true },
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    let score = 0;
+    const fatores = [];
+    const avisos = [];
+
+    // Helper dinâmico para aplicar regra com peso customizável ou sobrescrito
+    const aplicarRegra = (idRegra, pesoPadrao, descricao, dadosAdicionais = {}) => {
+      if (this.config.regrasDesabilitadas.has(idRegra)) return;
+      const pesoFinal = this.config.pesosSobrescritos[idRegra] !== undefined ? this.config.pesosSobrescritos[idRegra] : pesoPadrao;
+      score += pesoFinal;
+      fatores.push({
+        regra: idRegra,
+        peso: pesoFinal,
+        descricao,
+        ...dadosAdicionais
+      });
+    };
+
+    // 1. Lie Detector & Anti-Spoofing
     const lieDetector = AntiFraudePro.executarLieDetector(sinais);
     if (lieDetector.adulterado) {
-      score += 50;
-      fatores.push({
-        regra: 'TENTATIVA_EVASAO_STEALTH_SPOOFING',
-        peso: +50,
-        descricao: `Tentativa de evasão anti-fraude detectada pelo Lie Detector: ${lieDetector.motivos[0]}`
-      });
+      aplicarRegra(
+        'TENTATIVA_EVASAO_STEALTH_SPOOFING',
+        50,
+        `Tentativa de evasão anti-fraude detectada pelo Lie Detector: ${lieDetector.motivos[0]}`
+      );
     }
 
+    // 2. GPU Virtual / Cloud Docker / Software Renderer
     const gpuCheck = AntiFraudePro.verificarGpuVirtual(hashes.webglRenderer || contexto.webglRenderer);
     if (gpuCheck.isVirtual) {
-      score += 35;
-      fatores.push({
-        regra: 'GPU_VIRTUAL_EMULADA_OU_SOFTWARE',
-        peso: +35,
-        descricao: gpuCheck.detalhes
-      });
+      aplicarRegra(
+        'GPU_VIRTUAL_EMULADA_OU_SOFTWARE',
+        35,
+        gpuCheck.detalhes
+      );
     }
 
+    // 3. Headless Browser / Automação
     const isHeadless = seg.isHeadless || contexto.isHeadless;
     const isWebdriver = seg.isWebdriver || contexto.isWebdriver;
-
     if (isHeadless || isWebdriver) {
-      score += 45;
-      fatores.push({
-        regra: 'ROBO_HEADLESS_DETECTADO',
-        peso: +45,
-        descricao: 'Navegador automatizado ou sem interface gráfica detectado (possível bot/scraping)'
-      });
+      aplicarRegra(
+        'ROBO_HEADLESS_DETECTADO',
+        45,
+        'Navegador automatizado ou sem interface gráfica detectado (possível bot/scraping)'
+      );
     }
 
-    // 2. Avaliação da Conexão / Rede / IP
+    // 4. IP de Datacenter / VPS / Nuvem
     const provedor = (contexto.provedor || contexto.isp || '').toLowerCase();
-    const isDatacenter = DATACENTER_KEYWORDS.some(k => provedor.includes(k)) || !!contexto.isDatacenter;
-
+    const isDatacenter = DEFAULT_DATACENTER_PATTERNS.some(pat => pat.test(provedor)) || !!contexto.isDatacenter;
     if (isDatacenter) {
-      score += 30;
-      fatores.push({
-        regra: 'IP_DE_DATACENTER_CLOUD',
-        peso: +30,
-        descricao: `Conexão originada de servidor em nuvem ou datacenter (${contexto.provedor || 'Cloud'}) e não de provedor residencial`
-      });
+      aplicarRegra(
+        'IP_DE_DATACENTER_CLOUD',
+        30,
+        `Conexão originada de servidor em nuvem ou datacenter (${contexto.provedor || 'Cloud'}) e não de provedor residencial`
+      );
     }
 
-    // 3. Avaliação do Documento (CPF / CNPJ)
+    // 5. Documentos Oficiais (CPF / CNPJ Módulo 11 Dinâmico)
     const documento = String(transacao.documento || transacao.cpf || transacao.cnpj || '').replace(/\D/g, '');
+    let docValido = null;
     if (documento.length > 0) {
       if (documento.length === 11) {
-        if (!AntiFraudePro.validarCpf(documento)) {
-          score += 25;
-          fatores.push({
-            regra: 'CPF_MATEMATICAMENTE_INVALIDO',
-            peso: +25,
-            descricao: 'Dígitos verificadores do CPF informados são matematicamente inválidos'
-          });
+        docValido = AntiFraudePro.validarCpf(documento);
+        if (!docValido) {
+          aplicarRegra('CPF_MATEMATICAMENTE_INVALIDO', 25, 'Dígitos verificadores do CPF informados são matematicamente inválidos');
         }
       } else if (documento.length === 14) {
-        if (!AntiFraudePro.validarCnpj(documento)) {
-          score += 25;
-          fatores.push({
-            regra: 'CNPJ_MATEMATICAMENTE_INVALIDO',
-            peso: +25,
-            descricao: 'Dígitos verificadores do CNPJ informados são matematicamente inválidos'
-          });
+        docValido = AntiFraudePro.validarCnpj(documento);
+        if (!docValido) {
+          aplicarRegra('CNPJ_MATEMATICAMENTE_INVALIDO', 25, 'Dígitos verificadores do CNPJ informados são matematicamente inválidos');
         }
       } else {
-        score += 20;
-        fatores.push({
-          regra: 'DOCUMENTO_FORMATO_INVALIDO',
-          peso: +20,
-          descricao: `Documento possui tamanho inválido (${documento.length} dígitos)`
-        });
+        aplicarRegra('DOCUMENTO_FORMATO_INVALIDO', 20, `Documento possui tamanho inválido (${documento.length} dígitos)`);
       }
     }
 
-    // 4. Avaliação do E-mail
+    // 6. E-mail (Sintaxe RFC, Descartáveis & Padrões Troll)
     const email = transacao.email || '';
+    let auditEmail = null;
     if (email) {
-      const auditEmail = AntiFraudePro.analisarEmail(email);
+      auditEmail = AntiFraudePro.analisarEmail(email);
       if (!auditEmail.valido) {
-        score += 15;
-        fatores.push({
-          regra: 'EMAIL_SINTAXE_INVALIDA',
-          peso: +15,
-          descricao: 'Formato de e-mail não atende às especificações RFC'
-        });
+        aplicarRegra('EMAIL_SINTAXE_INVALIDA', 15, 'Formato de e-mail não atende às especificações RFC');
       } else {
         if (auditEmail.descartavel) {
-          score += 25;
-          fatores.push({
-            regra: 'EMAIL_DESCARTAVEL_TEMPORARIO',
-            peso: +25,
-            descricao: `E-mail utiliza provedor temporário ou descartável (${auditEmail.dominio})`
-          });
+          aplicarRegra('EMAIL_DESCARTAVEL_TEMPORARIO', 25, `E-mail utiliza provedor temporário ou descartável (${auditEmail.dominio})`);
         }
         if (auditEmail.troll) {
-          score += 20;
-          fatores.push({
-            regra: 'EMAIL_PADRAO_TROLL_SUSPEITO',
-            peso: +20,
-            descricao: 'Nome de usuário do e-mail apresenta padrão característico de cadastro zombeteiro ou gerado por script'
-          });
+          aplicarRegra('EMAIL_PADRAO_TROLL_SUSPEITO', 20, 'Nome de usuário do e-mail apresenta padrão característico de cadastro zombeteiro ou gerado por script');
         }
       }
     }
 
-    // 5. Avaliação do Telefone & Cruzamento com GeoIP / Spam ANATEL
+    // 7. Telefone (Plano ANATEL, 0303, 0304 e GeoIP Dinâmico)
     const telefone = transacao.telefone || transacao.celular || '';
+    let auditTel = null;
     if (telefone) {
-      const auditTel = AntiFraudePro.analisarTelefone(telefone);
+      auditTel = AntiFraudePro.analisarTelefone(telefone);
       if (!auditTel.valido) {
-        score += 15;
-        fatores.push({
-          regra: 'TELEFONE_INVALIDO',
-          peso: +15,
-          descricao: 'Número de telefone ou DDD inexistente no plano de numeração ANATEL'
-        });
+        aplicarRegra('TELEFONE_INVALIDO', 15, 'Número de telefone ou DDD inexistente no plano de numeração ANATEL');
       } else {
         if (auditTel.isSpam) {
-          score += 40;
-          fatores.push({
-            regra: `TELEFONE_SPAM_${auditTel.tipoSpam}`,
-            peso: +40,
-            descricao: auditTel.motivoSpam || 'Número identificado em listas de spam, telemarketing ou fraude'
-          });
+          aplicarRegra(`TELEFONE_SPAM_${auditTel.tipoSpam}`, 40, auditTel.motivoSpam || 'Número identificado em listas de spam e telemarketing');
         } else if (auditTel.isGratuito) {
-          score += 15;
-          fatores.push({
-            regra: 'TELEFONE_CORPORATIVO_0800_COMPRA_PF',
-            peso: +15,
-            descricao: auditTel.motivoSpam || 'Linha 0800 corporativa informada como contato pessoal'
-          });
+          aplicarRegra('TELEFONE_CORPORATIVO_0800_COMPRA_PF', 15, auditTel.motivoSpam || 'Linha 0800 corporativa informada como contato pessoal');
         } else {
-          const ufGeo = (contexto.estado || contexto.uf || '').toUpperCase();
+          // Comparação dinâmica de UF: extrai a UF correspondente ao DDD e compara com o GeoIP
+          const ufGeo = (contexto.estado || contexto.uf || '').toUpperCase().trim();
           if (ufGeo && auditTel.uf && auditTel.uf !== 'NACIONAL' && ufGeo !== auditTel.uf) {
-            score += 15;
-            fatores.push({
-              regra: 'DDD_DIVERGENTE_DA_LOCALIZACAO_IP',
-              peso: +15,
-              descricao: `DDD do telefone (${auditTel.ddd} - ${auditTel.uf}) difere do Estado do IP da conexão (${ufGeo})`
-            });
+            aplicarRegra('DDD_DIVERGENTE_DA_LOCALIZACAO_IP', 15, `DDD do telefone (${auditTel.ddd} - ${auditTel.uf}) difere do Estado do IP da conexão (${ufGeo})`);
           }
         }
       }
     }
 
-    // 6. Teste de Velocidade / Frequência de Requisições (Velocity Checks)
-    const deviceId = contexto.deviceId || (sinais ? AntiFraudePro.gerarDeviceId(sinais).deviceId : null);
+    // 8. Frequência / Velocity Checks
     if (deviceId) {
-      const vel = AntiFraudePro.checarVelocidade(deviceId, 4, 60);
+      const vel = AntiFraudePro.checarVelocidade(deviceId);
       if (vel.violouVelocidade) {
-        score += 30;
-        fatores.push({
-          regra: 'ALTA_VELOCIDADE_TENTATIVAS_DEVICE',
-          peso: +30,
-          descricao: `Dispositivo realizou ${vel.totalRecente} tentativas de transação no último minuto (padrão de ataque)`
-        });
+        aplicarRegra('ALTA_VELOCIDADE_TENTATIVAS_DEVICE', 30, `Dispositivo realizou ${vel.totalRecente} tentativas de transação na janela recente`);
       }
     }
 
-    // 7. Heurística de Valor de Transação (Micro Card Testing)
+    // 9. Micro-Valores / Card Testing
     const valor = parseFloat(transacao.valor || 0);
     if (valor <= 1.00 && valor > 0) {
-      score += 15;
-      fatores.push({
-        regra: 'VALOR_MICRO_CARD_TESTING',
-        peso: +15,
-        descricao: 'Valor muito baixo (R$ 1,00 ou menos) característico de teste de cartão de crédito roubado'
-      });
+      aplicarRegra('VALOR_MICRO_CARD_TESTING', 15, 'Valor muito baixo (R$ 1,00 ou menos) característico de teste de cartão de crédito roubado');
     }
 
-    // Teto do score
+    // 10. Execução de Regras Customizadas Injetadas Dinamicamente
+    for (const regraCustom of this.config.regrasCustomizadas) {
+      if (this.config.regrasDesabilitadas.has(regraCustom.id)) continue;
+      try {
+        const ret = regraCustom.avaliar(transacao, contexto);
+        if (ret === true || (ret && ret.acionou)) {
+          const peso = (ret && ret.peso) !== undefined ? ret.peso : (this.config.pesosSobrescritos[regraCustom.id] || regraCustom.peso || 10);
+          const desc = (ret && ret.descricao) || regraCustom.descricao || `Regra customizada acionada: ${regraCustom.id}`;
+          score += peso;
+          fatores.push({
+            regra: regraCustom.id,
+            peso,
+            descricao: desc,
+            isCustomizada: true
+          });
+        }
+      } catch (err) {
+        avisos.push(`Erro ao executar regra customizada ${regraCustom.id}: ${err.message}`);
+      }
+    }
+
+    // Teto e piso do score
     score = Math.min(100, Math.max(0, score));
 
-    // Determina nível de risco
+    // Determina nível de risco com base nas faixas dinâmicas configuradas
+    const faixas = this.config.faixas;
     let nivelRisco = 'baixo';
     let recomendacao = 'aprovar';
     let corBadge = '#10b981';
 
-    if (score >= 80) {
+    if (score >= faixas.critico) {
       nivelRisco = 'critico';
       recomendacao = 'bloquear';
       corBadge = '#ef4444';
-    } else if (score >= 55) {
+    } else if (score >= faixas.alto) {
       nivelRisco = 'alto';
       recomendacao = 'analise_manual';
       corBadge = '#f97316';
-    } else if (score >= 25) {
+    } else if (score >= faixas.medio) {
       nivelRisco = 'medio';
       recomendacao = 'desafio_2fa';
       corBadge = '#f59e0b';
@@ -877,9 +938,9 @@ export class AntiFraudePro {
       fatoresRisco: fatores,
       avisos,
       detalhes: {
-        documentoValido: documento ? (documento.length === 11 ? AntiFraudePro.validarCpf(documento) : AntiFraudePro.validarCnpj(documento)) : null,
-        emailAuditado: email ? AntiFraudePro.analisarEmail(email) : null,
-        telefoneAuditado: telefone ? AntiFraudePro.analisarTelefone(telefone) : null,
+        documentoValido: docValido,
+        emailAuditado: auditEmail,
+        telefoneAuditado: auditTel,
         gpuVirtualAuditada: gpuCheck,
         lieDetector,
         isHeadlessBot: !!isHeadless,

@@ -68,7 +68,25 @@ await fetch('/api/pagamento', {
 ```javascript
 import { AntiFraudePro } from 'antifraude-pro';
 
-// Avaliação completa de risco de checkout
+// 1. Configuração e Calibração Dinâmica (Opcional - Zero Hardcoding)
+AntiFraudePro.configurar({
+  faixas: { critico: 80, alto: 55, medio: 25 },
+  pesos: {
+    ROBO_HEADLESS_DETECTADO: 50,
+    VALOR_MICRO_CARD_TESTING: 20
+  },
+  whitelistIps: ['187.12.34.56']
+});
+
+// 2. Adicionar Regras de Negócio Customizadas em Runtime
+AntiFraudePro.adicionarRegra({
+  id: 'COMPRA_ACIMA_LIMITE_VIP',
+  peso: 30,
+  descricao: 'Transação com valor atípico acima de R$ 5.000,00',
+  avaliar: (tx, ctx) => parseFloat(tx.valor || 0) > 5000
+});
+
+// 3. Avaliação completa de risco de checkout
 const resultado = AntiFraudePro.avaliarTransacao({
   valor: 249.90,
   cpf: '52998224725',

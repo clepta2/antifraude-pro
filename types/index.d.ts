@@ -97,8 +97,37 @@ export interface ParecerRisco {
   timestamp: string;
 }
 
+export interface AntiFraudeConfig {
+  faixas?: {
+    critico?: number;
+    alto?: number;
+    medio?: number;
+  };
+  velocidade?: {
+    limitePadrao?: number;
+    janelaSegundosPadrao?: number;
+  };
+  pesos?: Record<string, number>;
+  desabilitar?: string[];
+  habilitar?: string[];
+  dominiosDescartaveis?: string[];
+  whitelistIps?: string[];
+  whitelistDeviceIds?: string[];
+}
+
+export interface RegraCustomizada {
+  id: string;
+  peso?: number;
+  descricao?: string;
+  avaliar: (transacao: Record<string, any>, contexto: Record<string, any>) => boolean | { acionou: boolean; peso?: number; descricao?: string };
+}
+
 export declare class AntiFraudePro {
   static get version(): string;
+  static config: AntiFraudeConfig;
+  static configurar(opcoes?: AntiFraudeConfig): AntiFraudeConfig;
+  static adicionarRegra(regra: RegraCustomizada): void;
+  static resetarConfiguracao(): void;
   static hashSha256(texto: string): string;
   static hexParaUuid(hex64: string): string;
   static validarCpf(cpf: string): boolean;

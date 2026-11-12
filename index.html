@@ -538,66 +538,9 @@ fetch('/api/checkout', {
 
   </div>
 
-  <script>
-    // ─── IMPLEMENTAÇÃO PURA DE SHA-256 ───
-    function sha256(ascii) {
-      function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
-      const mathPow = Math.pow;
-      const maxWord = mathPow(2, 32);
-      let lengthProperty = 'length';
-      let i, j, result = '';
-      const words = [];
-      const asciiBitLength = ascii[lengthProperty] * 8;
-      let hash = [], k = [], primeCounter = 0;
-      const isComposite = {};
-      for (let candidate = 2; primeCounter < 64; candidate++) {
-        if (!isComposite[candidate]) {
-          for (i = 0; i < 300; i += candidate) isComposite[i] = candidate;
-          hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
-          k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
-        }
-      }
-      ascii += '\x80';
-      while ((ascii[lengthProperty] % 64) - 56) ascii += '\x00';
-      for (i = 0; i < ascii[lengthProperty]; i++) {
-        j = ascii.charCodeAt(i);
-        if (j >> 8) return '';
-        words[i >> 2] |= j << ((3 - (i % 4)) * 8);
-      }
-      words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
-      words[words[lengthProperty]] = asciiBitLength;
-      for (j = 0; j < words[lengthProperty];) {
-        const w = words.slice(j, j += 16);
-        const oldHash = hash;
-        hash = hash.slice(0, 8);
-        for (i = 0; i < 64; i++) {
-          const w15 = w[i - 15], w2 = w[i - 2];
-          const s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
-          const s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
-          const ch = (hash[4] & hash[5]) ^ (~hash[4] & hash[6]);
-          const maj = (hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]);
-          const temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) + ch + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + s0 + w[i - 7] + s1) | 0)) | 0;
-          const temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) + maj) | 0;
-          hash = [(temp1 + temp2) | 0].concat(hash);
-          hash[4] = (hash[4] + temp1) | 0;
-          hash.pop();
-        }
-        for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
-      }
-      for (i = 0; i < 8; i++) {
-        for (j = 3; j + 1; j--) {
-          const b = (hash[i] >> (j * 8)) & 255;
-          result += ((b < 16) ? '0' : '') + b.toString(16);
-        }
-      }
-      return result;
-    }
-
-    function hexParaUuid(hex64) {
-      if (!hex64 || hex64.length < 32) return '00000000-0000-0000-0000-000000000000';
-      const clean = hex64.replace(/[^a-f0-9]/gi, '').padEnd(32, '0').slice(0, 32);
-      return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-4${clean.slice(13, 16)}-a${clean.slice(17, 20)}-${clean.slice(20, 32)}`;
-    }
+    <script type="module">
+    import { AntiFraudePro } from '/antifraude-pro.js';
+    window.AntiFraudePro = AntiFraudePro;
 
     window.switchTab = function(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -608,69 +551,33 @@ fetch('/api/checkout', {
 
     let sinaisLocais = null;
 
-    async function coletarSinaisBrowser() {
-      const nav = window.navigator || {};
-      const scr = window.screen || {};
-      let canvasHash = 'nao_suportado';
-      try {
-        const c = document.createElement('canvas');
-        c.width = 240; c.height = 60;
-        const ctx = c.getContext('2d');
-        if (ctx) {
-          ctx.textBaseline = 'top';
-          ctx.font = '14px Arial';
-          ctx.fillStyle = '#f60';
-          ctx.fillRect(125, 1, 62, 20);
-          ctx.fillStyle = '#069';
-          ctx.fillText('AntiFraudePro-🛡️-2026', 2, 15);
-          canvasHash = sha256(c.toDataURL()).slice(0, 16);
-        }
-      } catch (e) { canvasHash = 'bloqueado'; }
-
-      let webglRenderer = 'desconhecido';
-      try {
-        const gl = document.createElement('canvas').getContext('webgl');
-        if (gl) {
-          const ext = gl.getExtension('WEBGL_debug_renderer_info');
-          if (ext) webglRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-        }
-      } catch (e) {}
-
-      const isBot = !!nav.webdriver || /HeadlessChrome/i.test(nav.userAgent || '');
-
-      return {
-        tela: { largura: scr.width, altura: scr.height, profundidadeCores: scr.colorDepth },
-        hardware: { concorrenciaCpus: nav.hardwareConcurrency || 4, memoriaGb: nav.deviceMemory || 8 },
-        software: { plataforma: nav.platform, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        hashes: { canvas: canvasHash, webglRenderer },
-        seguranca: { isHeadless: isBot, isWebdriver: !!nav.webdriver }
-      };
-    }
-
     async function carregarDevice() {
-      sinaisLocais = await coletarSinaisBrowser();
-      const semente = `${sinaisLocais.tela.largura}||${sinaisLocais.tela.altura}||${sinaisLocais.hardware.concorrenciaCpus}||${sinaisLocais.software.plataforma}||${sinaisLocais.hashes.canvas}||${sinaisLocais.hashes.webglRenderer}`;
-      const hash = sha256(semente);
-      const deviceId = `dev_${hash}`;
-      const uuid = hexParaUuid(hash);
+      try {
+        sinaisLocais = await AntiFraudePro.coletarSinaisNavegador();
+        const dev = AntiFraudePro.gerarDeviceId(sinaisLocais);
 
-      document.getElementById('dispDeviceId').innerText = deviceId.slice(0, 34) + '...';
-      document.getElementById('dispDeviceId').title = deviceId;
-      document.getElementById('dispDeviceUuid').innerText = uuid;
+        document.getElementById('dispDeviceId').innerText = dev.deviceId.slice(0, 34) + '...';
+        document.getElementById('dispDeviceId').title = dev.deviceId;
+        document.getElementById('dispDeviceUuid').innerText = dev.deviceUuid;
 
-      document.getElementById('dispCpuMem').innerText = `${sinaisLocais.hardware.concorrenciaCpus} CPUs / ${sinaisLocais.hardware.memoriaGb} GB RAM`;
-      document.getElementById('dispTela').innerText = `${sinaisLocais.tela.largura}x${sinaisLocais.tela.altura} (${sinaisLocais.tela.profundidadeCores}-bit)`;
-      document.getElementById('dispCanvas').innerText = sinaisLocais.hashes.canvas;
-      
-      const botEl = document.getElementById('dispBot');
-      if (sinaisLocais.seguranca.isHeadless) {
-        botEl.innerText = '⚠️ Robô / Bot Detectado';
-        botEl.style.color = 'var(--danger)';
-      } else {
-        botEl.innerText = '🟢 Humano Confiável';
-        botEl.style.color = 'var(--primary)';
+        const hw = sinaisLocais.hardware || {};
+        const sc = sinaisLocais.tela || {};
+        document.getElementById('dispCpuMem').innerText = `${hw.concorrenciaCpus || 4} CPUs / ${hw.memoriaGb || 8} GB RAM`;
+        document.getElementById('dispTela').innerText = `${sc.largura}x${sc.altura} (${sc.profundidadeCores}-bit)`;
+        document.getElementById('dispCanvas').innerText = sinaisLocais.hashes?.canvas || 'Ativo';
+        
+        const botEl = document.getElementById('dispBot');
+        if (sinaisLocais.seguranca?.isHeadless || sinaisLocais.seguranca?.isWebdriver) {
+          botEl.innerText = '⚠️ Robô / Bot Detectado';
+          botEl.style.color = 'var(--danger)';
+        } else {
+          botEl.innerText = '🟢 Humano Confiável';
+          botEl.style.color = 'var(--primary)';
+        }
+        document.getElementById('dispGpu').innerText = sinaisLocais.hashes?.webglRenderer || 'Desconhecido';
+      } catch (e) {
+        console.error('Erro ao carregar dispositivo:', e);
       }
-      document.getElementById('dispGpu').innerText = sinaisLocais.hashes.webglRenderer;
     }
 
     window.escanearNovamente = function() {
@@ -718,7 +625,7 @@ fetch('/api/checkout', {
         document.getElementById('simValor').value = '180.00';
         document.getElementById('simCpf').value = '52998224725';
         document.getElementById('simEmail').value = 'contato@empresa.com.br';
-        document.getElementById('simTelefone').value = '0303-123-4567'; // Prefixo Telemarketing ANATEL
+        document.getElementById('simTelefone').value = '0303-123-4567';
         document.getElementById('simUfIp').value = 'SP';
         document.getElementById('simTipoRede').value = 'residencial';
         document.getElementById('simBotCheck').checked = false;
@@ -736,7 +643,8 @@ fetch('/api/checkout', {
 
     window.calcularRisco = async function() {
       const sinaisEnvio = sinaisLocais ? JSON.parse(JSON.stringify(sinaisLocais)) : {};
-      if (simGpuVirtual && sinaisEnvio.hashes) {
+      if (simGpuVirtual) {
+        if (!sinaisEnvio.hashes) sinaisEnvio.hashes = {};
         sinaisEnvio.hashes.webglRenderer = 'Google SwiftShader (LLVM 10.0)';
       }
 
@@ -764,49 +672,23 @@ fetch('/api/checkout', {
           return;
         }
       } catch (e) {
-        console.warn('Fallback para cálculo local do score de risco:', e);
+        console.warn('API de rede offline, executando motor dinâmico AntiFraudePro diretamente:', e);
       }
 
-      // Fallback local se backend não responder
-      let score = 0;
-      const fatores = [];
-      if (payload.isHeadless) {
-        score += 45;
-        fatores.push({ descricao: 'Navegador automatizado ou sem interface gráfica detectado (possível bot)', peso: 45 });
-      }
-      if (payload.isDatacenter) {
-        score += 30;
-        fatores.push({ descricao: 'Conexão originada de servidor em nuvem ou datacenter (não residencial)', peso: 30 });
-      }
-      if (payload.cpf === '11111111111') {
-        score += 25;
-        fatores.push({ descricao: 'Dígitos verificadores do CPF informados são matematicamente inválidos', peso: 25 });
-      }
-      if (payload.email && (payload.email.includes('tempmail') || payload.email.includes('yopmail'))) {
-        score += 25;
-        fatores.push({ descricao: 'E-mail utiliza provedor temporário ou descartável', peso: 25 });
-      }
-      if (payload.telefone && payload.telefone.includes('92') && payload.uf === 'SP') {
-        score += 15;
-        fatores.push({ descricao: 'DDD do telefone (92 - AM) difere do Estado do IP da conexão (SP)', peso: 15 });
-      }
-      if (parseFloat(payload.valor) <= 1.00) {
-        score += 15;
-        fatores.push({ descricao: 'Valor muito baixo (R$ 1,00 ou menos) característico de teste de cartão de crédito', peso: 15 });
-      }
-
-      score = Math.min(100, score);
-      let nivel = score >= 80 ? 'critico' : (score >= 55 ? 'alto' : (score >= 25 ? 'medio' : 'baixo'));
-      let rec = score >= 80 ? 'bloquear' : (score >= 55 ? 'analise_manual' : (score >= 25 ? 'desafio_2fa' : 'aprovar'));
-      let cor = score >= 80 ? '#ef4444' : (score >= 55 ? '#f97316' : (score >= 25 ? '#f59e0b' : '#10b981'));
-
-      renderizarResultado({
-        scoreRisco: score,
-        nivelRisco: nivel,
-        recomendacao: rec,
-        corBadge: cor,
-        fatoresRisco: fatores
+      // Avaliação Local 100% Algorítmica via AntiFraudePro Dynamic Engine (Zero Hardcoding)
+      const resLocal = AntiFraudePro.avaliarTransacao({
+        valor: payload.valor,
+        cpf: payload.cpf,
+        email: payload.email,
+        telefone: payload.telefone
+      }, {
+        estado: payload.uf,
+        isDatacenter: payload.isDatacenter,
+        isHeadless: payload.isHeadless,
+        sinais: payload.sinais,
+        webglRenderer: payload.sinais?.hashes?.webglRenderer
       });
+      renderizarResultado(resLocal);
     };
 
     function renderizarResultado(res) {

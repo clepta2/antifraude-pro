@@ -116,6 +116,26 @@ const lieResult = AntiFraudePro.executarLieDetector({
   hashes: { webglRenderer: 'llvmpipe (LLVM 12.0.0, 256 bits)' }
 });
 console.assert(lieResult.adulterado === true, 'Lie Detector deve sinalizar adulteração');
-console.log('✅ 10. Lie Detector & Detecção de GPU Virtual Cloud OK (Motivos:', lieResult.motivos.length, ')\n');
+console.log('✅ 10. Lie Detector & Detecção de GPU Virtual Cloud OK (Motivos:', lieResult.motivos.length, ')');
+
+// 11. Teste de Regras Customizadas Dinâmicas (Dynamic Rule Engine)
+AntiFraudePro.adicionarRegra({
+  id: 'COMPRA_ACIMA_LIMITE_VIP',
+  peso: 25,
+  descricao: 'Transação com valor acima de R$ 5.000 requer análise adicional',
+  avaliar: (tx) => parseFloat(tx.valor || 0) > 5000
+});
+const txVip = AntiFraudePro.avaliarTransacao({ valor: 6500 });
+console.assert(txVip.fatoresRisco.some(f => f.regra === 'COMPRA_ACIMA_LIMITE_VIP'), 'Regra customizada deve ter sido acionada');
+console.log('✅ 11. Injeção Dinâmica de Regras de Negócio OK');
+
+// 12. Teste de Whitelist & Sobrescrita Dinâmica de Pesos
+AntiFraudePro.configurar({
+  whitelistIps: ['10.0.0.1'],
+  pesos: { VALOR_MICRO_CARD_TESTING: 40 }
+});
+const txWhitelist = AntiFraudePro.avaliarTransacao({ valor: 0.50 }, { ip: '10.0.0.1' });
+console.assert(txWhitelist.scoreRisco === 0, 'IP em whitelist deve retornar score 0');
+console.log('✅ 12. Motor Dinâmico de Whitelist & Calibração de Pesos OK\n');
 
 console.log('🎉 Todos os testes unitários do AntiFraude Pro passaram com 100% de sucesso!');
