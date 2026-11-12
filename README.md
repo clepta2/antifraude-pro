@@ -107,7 +107,10 @@ if (resultado.recomendacao === 'bloquear') {
 
 | Regra | Penalidade | Descrição |
 | :--- | :---: | :--- |
+| `TENTATIVA_EVASAO_STEALTH_SPOOFING` | **+50 pts** | Lie Detector: Manipulação de prototype (`navigator.webdriver`) ou artefatos CDP |
 | `ROBO_HEADLESS_DETECTADO` | **+45 pts** | Navegador automatizado (Puppeteer, Selenium, Playwright) |
+| `TELEFONE_SPAM_ANATEL` | **+40 pts** | Prefixo oficial 0303 (Telemarketing) ou 0304 (Cobrança Ativa) |
+| `GPU_VIRTUAL_EMULADA_OU_SOFTWARE` | **+35 pts** | Renderizador de software virtual (Google SwiftShader, llvmpipe, Mesa) |
 | `IP_DE_DATACENTER_CLOUD` | **+30 pts** | Conexão vinda de VPS/Nuvem (AWS, GCP, DigitalOcean, Oracle) |
 | `ALTA_VELOCIDADE_TENTATIVAS_DEVICE` | **+30 pts** | Múltiplas tentativas de pagamento por minuto no mesmo aparelho |
 | `CPF_MATEMATICAMENTE_INVALIDO` | **+25 pts** | Dígitos verificadores do CPF falsos ou inexistentes |

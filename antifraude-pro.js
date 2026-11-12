@@ -2,11 +2,13 @@
  * antifraude-pro.js
  * SDK Oficial e Motor Universal de Segurança & Anti-Fraude
  * 
- * Funcionalidades:
+ * Funcionalidades V1.1.0:
  * - Device Fingerprint Determinístico Imutável (100% LGPD / Zero Cookies)
- * - Avaliação de Risco de Transações (Score 0-100)
- * - Detecção Avançada de Bots, Automação & Navegadores Headless (Puppeteer, Playwright, Selenium)
- * - Detecção de IP Datacenter, VPS, Proxy, Tor e VPNs
+ * - Avaliação Heurística de Risco de Transações (Score 0 a 100)
+ * - Lie Detector de Navegador (Detecção de Stealth Evasion, Selenium CDP e Adulteração de Protótipos)
+ * - Detecção de GPUs Virtuais & Emuladores Cloud (Google SwiftShader, llvmpipe, Mesa, VMware, VirtualBox)
+ * - Inteligência de Telefonia Anti-Spam ANATEL (Prefixos 0303 Telemarketing e 0304 Cobrança)
+ * - Detecção de IP Datacenter, VPS, Proxy e Nuvem
  * - Cruzamento Heurístico de Documentos, E-mails Descartáveis, DDD e GeoIP
  * - Verificação de Velocidade (Anti-Card Testing e Força Bruta)
  * 
@@ -93,15 +95,30 @@ function sha256(ascii) {
 const DATACENTER_KEYWORDS = [
   'amazon', 'aws', 'google', 'gcp', 'microsoft', 'azure', 'digitalocean',
   'cloudflare', 'hetzner', 'ovh', 'linode', 'oracle', 'alibaba', 'vultr',
-  'fastly', 'akamai', 'tencent', 'leaseweb', 'choopa', 'contabo', 'kamatera'
+  'fastly', 'akamai', 'tencent', 'leaseweb', 'choopa', 'contabo', 'kamatera',
+  'equinix', 'rackspace'
 ];
 
-// ─── LISTA RESUMIDA DE DOMÍNIOS DE E-MAILS DESCARTÁVEIS COMUNS ───
+// ─── LISTA DE GPUS VIRTUAIS & RENDERIZADORES DE SOFTWARE (HEADLESS / VPS) ───
+const SOFTWARE_GPU_KEYWORDS = [
+  'swiftshader',
+  'llvmpipe',
+  'mesa offscreen',
+  'virtualbox',
+  'vmware',
+  'qemu',
+  'microsoft basic render',
+  'softpipe',
+  'software rasterizer',
+  'gallium'
+];
+
+// ─── LISTA DE DOMÍNIOS DE E-MAILS DESCARTÁVEIS COMUNS ───
 const DOMINIOS_DESCARTAVEIS = new Set([
   'mailinator.com', 'yopmail.com', 'tempmail.com', 'guerrillamail.com', '10minutemail.com',
   'trashmail.com', 'sharklasers.com', 'dispostable.com', 'getairmail.com', 'throwawaymail.com',
   'maildrop.cc', 'temp-mail.org', 'crazymailing.com', 'fakeinbox.com', 'emailondeck.com',
-  'mohmal.com', 'burnermail.io', 'inboxbear.com', 'mytemp.email', 'dropmail.me'
+  'mohmal.com', 'burnermail.io', 'inboxbear.com', 'mytemp.email', 'dropmail.me', 'disposable.com'
 ]);
 
 // ─── MAPA DE DDDs PARA UFs (BRASIL ANATEL) ───
@@ -139,7 +156,7 @@ export class AntiFraudePro {
    * Versão oficial do motor AntiFraude Pro
    */
   static get version() {
-    return '1.0.0';
+    return '1.1.0';
   }
 
   /**
@@ -213,21 +230,71 @@ export class AntiFraudePro {
   }
 
   /**
-   * Validação básica de telefone brasileiro e extração de DDD
+   * Valida e inspeciona telefone com inteligência ANATEL e detecção de Spam
    * @param {string} telefone 
-   * @returns {{ valido: boolean, ddd: number|null, uf: string|null, isCelular: boolean }}
+   * @returns {{ valido: boolean, ddd: number|null, uf: string|null, isCelular: boolean, isSpam: boolean, tipoSpam: string|null, motivoSpam: string|null }}
    */
   static analisarTelefone(telefone) {
-    if (!telefone) return { valido: false, ddd: null, uf: null, isCelular: false };
+    if (!telefone) return { valido: false, ddd: null, uf: null, isCelular: false, isSpam: false, tipoSpam: null, motivoSpam: null };
     const limpo = String(telefone).replace(/\D/g, '');
+
+    // 1. Prefixo Regulatório Obrigatório ANATEL 0303 (Telemarketing Ativo)
+    if (limpo.startsWith('0303') || (limpo.startsWith('303') && limpo.length === 10)) {
+      return {
+        valido: true,
+        ddd: null,
+        uf: 'NACIONAL',
+        isCelular: false,
+        isSpam: true,
+        tipoSpam: 'TELEMARKETING_ATIVO_ANATEL_0303',
+        motivoSpam: 'Número com prefixo oficial 0303 obrigatório da ANATEL para telemarketing ativo'
+      };
+    }
+
+    // 2. Prefixo Regulatório Obrigatório ANATEL 0304 (Cobrança Ativa)
+    if (limpo.startsWith('0304') || (limpo.startsWith('304') && limpo.length === 10)) {
+      return {
+        valido: true,
+        ddd: null,
+        uf: 'NACIONAL',
+        isCelular: false,
+        isSpam: true,
+        tipoSpam: 'COBRANCA_ATIVA_ANATEL_0304',
+        motivoSpam: 'Número com prefixo oficial 0304 obrigatório da ANATEL para cobrança e recuperação de crédito'
+      };
+    }
+
+    // 3. Números Corporativos 0800 / 0300 (Geralmente indevidos para cadastro individual em checkout)
+    if (limpo.startsWith('0800') || limpo.startsWith('0300')) {
+      return {
+        valido: true,
+        ddd: null,
+        uf: 'NACIONAL',
+        isCelular: false,
+        isSpam: false,
+        isGratuito: true,
+        tipoSpam: 'NUMERO_0800_CORPORATIVO',
+        motivoSpam: 'Linha corporativa gratuita 0800/0300 informada como telefone pessoal'
+      };
+    }
+
     const num = limpo.startsWith('55') && limpo.length >= 12 ? limpo.slice(2) : limpo;
     
     if (num.length !== 10 && num.length !== 11) {
-      return { valido: false, ddd: null, uf: null, isCelular: false };
+      return { valido: false, ddd: null, uf: null, isCelular: false, isSpam: false, tipoSpam: null, motivoSpam: null };
     }
 
+    // 4. Detecção de Números Falsos / Repetições de teclado
     if (/^(\d)\1{9,10}$/.test(num)) {
-      return { valido: false, ddd: null, uf: null, isCelular: false };
+      return {
+        valido: false,
+        ddd: null,
+        uf: null,
+        isCelular: false,
+        isSpam: true,
+        tipoSpam: 'NUMERO_REPETICAO_FAKE',
+        motivoSpam: 'Número com todos os dígitos idênticos ou padrão de teclado'
+      };
     }
 
     const ddd = parseInt(num.slice(0, 2), 10);
@@ -238,7 +305,10 @@ export class AntiFraudePro {
       valido: !!uf,
       ddd: uf ? ddd : null,
       uf,
-      isCelular
+      isCelular,
+      isSpam: false,
+      tipoSpam: null,
+      motivoSpam: null
     };
   }
 
@@ -283,6 +353,72 @@ export class AntiFraudePro {
       descartavel,
       troll,
       dominio
+    };
+  }
+
+  /**
+   * Identifica se uma GPU/Renderizador WebGL é software virtual ou VPS
+   * @param {string} webglRenderer 
+   * @returns {{ isVirtual: boolean, nome: string|null, detalhes: string|null }}
+   */
+  static verificarGpuVirtual(webglRenderer) {
+    if (!webglRenderer || typeof webglRenderer !== 'string') {
+      return { isVirtual: false, nome: null, detalhes: null };
+    }
+    const lower = webglRenderer.toLowerCase();
+    for (const kw of SOFTWARE_GPU_KEYWORDS) {
+      if (lower.includes(kw)) {
+        return {
+          isVirtual: true,
+          nome: kw,
+          detalhes: `Renderizador de software ou emulador de máquina virtual detectado (${webglRenderer})`
+        };
+      }
+    }
+    return { isVirtual: false, nome: null, detalhes: null };
+  }
+
+  /**
+   * Lie Detector de Navegador (Detector de Evasão Stealth, CDP e Adulteração de Protótipos)
+   * @param {object} sinais Sinais coletados do cliente
+   * @returns {{ adulterado: boolean, motivos: string[], confianca: number }}
+   */
+  static executarLieDetector(sinais = {}) {
+    const motivos = [];
+    const seg = sinais.seguranca || {};
+    const tela = sinais.tela || {};
+    const hashes = sinais.hashes || {};
+
+    // 1. Verificação de Adulteração de Webdriver (Stealth Bypass)
+    if (seg.webdriverSpoofed) {
+      motivos.push('Propriedade navigator.webdriver foi manipulada ou teve seu prototype adulterado (anti-detect)');
+    }
+
+    // 2. Artefatos de Automação do Chrome DevTools Protocol / Selenium
+    if (seg.hasCdcArtifacts) {
+      motivos.push('Variáveis internas de controle do ChromeDriver/Selenium detectadas no objeto window ($cdc_)');
+    }
+
+    // 3. Janela com Dimensão Zero (Headless sem interface)
+    if (tela.outerLargura === 0 && tela.outerAltura === 0 && (tela.largura > 0 || tela.altura > 0)) {
+      motivos.push('Janela do navegador possui dimensões outer 0x0 (comportamento característico de processos headless em background)');
+    }
+
+    // 4. Inconsistência de GPU Virtual (SwiftShader / Mesa em navegador desktop)
+    const gpuCheck = AntiFraudePro.verificarGpuVirtual(hashes.webglRenderer);
+    if (gpuCheck.isVirtual) {
+      motivos.push(gpuCheck.detalhes);
+    }
+
+    // 5. Inconsistência de Plugins em Desktop
+    if (seg.hasPluginsInconsistency) {
+      motivos.push('Navegador desktop operando sem plugins instalados (padrão de imagem headless Chromium)');
+    }
+
+    return {
+      adulterado: motivos.length > 0,
+      motivos,
+      confianca: motivos.length > 0 ? 95 : 10
     };
   }
 
@@ -360,13 +496,51 @@ export class AntiFraudePro {
       audioHash = 'bloqueado';
     }
 
-    // 4. Detecção de Automação / Headless
-    const isWebdriver = !!nav.webdriver;
+    // 4. Detecção de Evasão Stealth & Adulteração (Lie Detector)
+    let cdcFound = false;
+    try {
+      const wKeys = Object.keys(window);
+      for (let i = 0; i < wKeys.length; i++) {
+        if (wKeys[i].startsWith('cdc_') || wKeys[i].startsWith('$cdc_') || wKeys[i].includes('__webdriver')) {
+          cdcFound = true;
+          break;
+        }
+      }
+      if (!cdcFound && typeof document !== 'undefined') {
+        const dKeys = Object.keys(document);
+        for (let i = 0; i < dKeys.length; i++) {
+          if (dKeys[i].startsWith('cdc_') || dKeys[i].startsWith('$cdc_')) {
+            cdcFound = true;
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+
+    let webdriverSpoofed = false;
+    try {
+      if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+        const desc = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver');
+        if (desc && desc.get && typeof desc.get.toString === 'function') {
+          if (!desc.get.toString().includes('native code')) {
+            webdriverSpoofed = true;
+          }
+        }
+      }
+    } catch (e) {}
+
+    const isWebdriver = !!nav.webdriver || webdriverSpoofed;
+    const isVirtualGpu = AntiFraudePro.verificarGpuVirtual(webglRenderer).isVirtual;
+    const isZeroDimension = (typeof window.outerWidth === 'number' && window.outerWidth === 0 && window.outerHeight === 0);
+    const hasPluginsInconsistency = (!nav.plugins || nav.plugins.length === 0) && !/mobile|android|iphone/i.test(nav.userAgent || '');
+
     const isHeadless = isWebdriver ||
-      /HeadlessChrome/.test(nav.userAgent || '') ||
+      isZeroDimension ||
+      isVirtualGpu ||
+      /HeadlessChrome|PhantomJS|Playwright|Puppeteer/i.test(nav.userAgent || '') ||
       !nav.languages ||
       nav.languages.length === 0 ||
-      (nav.plugins && nav.plugins.length === 0 && !/mobile|android|iphone/i.test(nav.userAgent || ''));
+      hasPluginsInconsistency;
 
     const timeZone = (Intl && Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions().timeZone) || 'desconhecido';
 
@@ -374,6 +548,8 @@ export class AntiFraudePro {
       tela: {
         largura: scr.width || 0,
         altura: scr.height || 0,
+        outerLargura: typeof window.outerWidth === 'number' ? window.outerWidth : 0,
+        outerAltura: typeof window.outerHeight === 'number' ? window.outerHeight : 0,
         profundidadeCores: scr.colorDepth || 0,
         pixelRatio: window.devicePixelRatio || 1
       },
@@ -396,6 +572,11 @@ export class AntiFraudePro {
       },
       seguranca: {
         isWebdriver,
+        webdriverSpoofed,
+        hasCdcArtifacts: cdcFound,
+        isZeroDimension,
+        isVirtualGpu,
+        hasPluginsInconsistency,
         isHeadless,
         hasTouch: (nav.maxTouchPoints || 0) > 0 || 'ontouchstart' in window
       },
@@ -487,9 +668,31 @@ export class AntiFraudePro {
     const fatores = [];
     const avisos = [];
 
-    // 1. Avaliação do Dispositivo & Navegador
+    // 1. Avaliação do Dispositivo & Navegador (Lie Detector & Anti-Bot)
     const sinais = contexto.sinais || {};
     const seg = sinais.seguranca || {};
+    const hashes = sinais.hashes || {};
+
+    const lieDetector = AntiFraudePro.executarLieDetector(sinais);
+    if (lieDetector.adulterado) {
+      score += 50;
+      fatores.push({
+        regra: 'TENTATIVA_EVASAO_STEALTH_SPOOFING',
+        peso: +50,
+        descricao: `Tentativa de evasão anti-fraude detectada pelo Lie Detector: ${lieDetector.motivos[0]}`
+      });
+    }
+
+    const gpuCheck = AntiFraudePro.verificarGpuVirtual(hashes.webglRenderer || contexto.webglRenderer);
+    if (gpuCheck.isVirtual) {
+      score += 35;
+      fatores.push({
+        regra: 'GPU_VIRTUAL_EMULADA_OU_SOFTWARE',
+        peso: +35,
+        descricao: gpuCheck.detalhes
+      });
+    }
+
     const isHeadless = seg.isHeadless || contexto.isHeadless;
     const isWebdriver = seg.isWebdriver || contexto.isWebdriver;
 
@@ -498,13 +701,12 @@ export class AntiFraudePro {
       fatores.push({
         regra: 'ROBO_HEADLESS_DETECTADO',
         peso: +45,
-        descricao: 'Navegador automatizado ou sem interface gráfica detectado (possível bot)'
+        descricao: 'Navegador automatizado ou sem interface gráfica detectado (possível bot/scraping)'
       });
     }
 
     // 2. Avaliação da Conexão / Rede / IP
     const provedor = (contexto.provedor || contexto.isp || '').toLowerCase();
-    const asn = contexto.asn || '';
     const isDatacenter = DATACENTER_KEYWORDS.some(k => provedor.includes(k)) || !!contexto.isDatacenter;
 
     if (isDatacenter) {
@@ -578,7 +780,7 @@ export class AntiFraudePro {
       }
     }
 
-    // 5. Avaliação do Telefone & Cruzamento com GeoIP
+    // 5. Avaliação do Telefone & Cruzamento com GeoIP / Spam ANATEL
     const telefone = transacao.telefone || transacao.celular || '';
     if (telefone) {
       const auditTel = AntiFraudePro.analisarTelefone(telefone);
@@ -590,19 +792,35 @@ export class AntiFraudePro {
           descricao: 'Número de telefone ou DDD inexistente no plano de numeração ANATEL'
         });
       } else {
-        const ufGeo = (contexto.estado || contexto.uf || '').toUpperCase();
-        if (ufGeo && auditTel.uf && ufGeo !== auditTel.uf) {
+        if (auditTel.isSpam) {
+          score += 40;
+          fatores.push({
+            regra: `TELEFONE_SPAM_${auditTel.tipoSpam}`,
+            peso: +40,
+            descricao: auditTel.motivoSpam || 'Número identificado em listas de spam, telemarketing ou fraude'
+          });
+        } else if (auditTel.isGratuito) {
           score += 15;
           fatores.push({
-            regra: 'DDD_DIVERGENTE_DA_LOCALIZACAO_IP',
+            regra: 'TELEFONE_CORPORATIVO_0800_COMPRA_PF',
             peso: +15,
-            descricao: `DDD do telefone (${auditTel.ddd} - ${auditTel.uf}) difere do Estado do IP da conexão (${ufGeo})`
+            descricao: auditTel.motivoSpam || 'Linha 0800 corporativa informada como contato pessoal'
           });
+        } else {
+          const ufGeo = (contexto.estado || contexto.uf || '').toUpperCase();
+          if (ufGeo && auditTel.uf && auditTel.uf !== 'NACIONAL' && ufGeo !== auditTel.uf) {
+            score += 15;
+            fatores.push({
+              regra: 'DDD_DIVERGENTE_DA_LOCALIZACAO_IP',
+              peso: +15,
+              descricao: `DDD do telefone (${auditTel.ddd} - ${auditTel.uf}) difere do Estado do IP da conexão (${ufGeo})`
+            });
+          }
         }
       }
     }
 
-    // 6. Teste de Velocidade / Frequência de Requisições (Velocity)
+    // 6. Teste de Velocidade / Frequência de Requisições (Velocity Checks)
     const deviceId = contexto.deviceId || (sinais ? AntiFraudePro.gerarDeviceId(sinais).deviceId : null);
     if (deviceId) {
       const vel = AntiFraudePro.checarVelocidade(deviceId, 4, 60);
@@ -616,7 +834,7 @@ export class AntiFraudePro {
       }
     }
 
-    // 7. Heurística de Valor de Transação
+    // 7. Heurística de Valor de Transação (Micro Card Testing)
     const valor = parseFloat(transacao.valor || 0);
     if (valor <= 1.00 && valor > 0) {
       score += 15;
@@ -661,6 +879,9 @@ export class AntiFraudePro {
       detalhes: {
         documentoValido: documento ? (documento.length === 11 ? AntiFraudePro.validarCpf(documento) : AntiFraudePro.validarCnpj(documento)) : null,
         emailAuditado: email ? AntiFraudePro.analisarEmail(email) : null,
+        telefoneAuditado: telefone ? AntiFraudePro.analisarTelefone(telefone) : null,
+        gpuVirtualAuditada: gpuCheck,
+        lieDetector,
         isHeadlessBot: !!isHeadless,
         isDatacenterConexao: isDatacenter,
         totalFatoresAcionados: fatores.length

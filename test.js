@@ -97,6 +97,25 @@ for (let i = 0; i < 4; i++) {
 }
 const velUltima = AntiFraudePro.checarVelocidade(chaveTeste, 3, 60);
 console.assert(velUltima.violouVelocidade === true, 'Deve violar limite de velocidade');
-console.log('✅ 8. Monitor de Velocidade / Brute Force OK (Total no minuto:', velUltima.totalRecente, ')\n');
+console.log('✅ 8. Monitor de Velocidade / Brute Force OK (Total no minuto:', velUltima.totalRecente, ')');
+
+// 9. Teste de Detecção de Spam Telefônico ANATEL 0303 / 0304
+const tel0303 = AntiFraudePro.analisarTelefone('03031234567');
+console.assert(tel0303.isSpam === true, 'Prefixo 0303 deve ser marcado como Spam');
+console.assert(tel0303.tipoSpam === 'TELEMARKETING_ATIVO_ANATEL_0303', 'Deve ser telemarketing 0303');
+const tel0304 = AntiFraudePro.analisarTelefone('03049876543');
+console.assert(tel0304.isSpam === true, 'Prefixo 0304 deve ser marcado como Spam');
+console.assert(tel0304.tipoSpam === 'COBRANCA_ATIVA_ANATEL_0304', 'Deve ser cobranca 0304');
+console.log('✅ 9. Inteligência Telefônica Anti-Spam ANATEL (0303 / 0304) OK');
+
+// 10. Teste de Detecção de GPU Virtual & Lie Detector
+const gpuSwift = AntiFraudePro.verificarGpuVirtual('Google SwiftShader (LLVM 10.0)');
+console.assert(gpuSwift.isVirtual === true, 'SwiftShader deve ser detectado como GPU virtual');
+const lieResult = AntiFraudePro.executarLieDetector({
+  seguranca: { webdriverSpoofed: true, hasCdcArtifacts: true },
+  hashes: { webglRenderer: 'llvmpipe (LLVM 12.0.0, 256 bits)' }
+});
+console.assert(lieResult.adulterado === true, 'Lie Detector deve sinalizar adulteração');
+console.log('✅ 10. Lie Detector & Detecção de GPU Virtual Cloud OK (Motivos:', lieResult.motivos.length, ')\n');
 
 console.log('🎉 Todos os testes unitários do AntiFraude Pro passaram com 100% de sucesso!');

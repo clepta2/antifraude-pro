@@ -29,9 +29,37 @@ export interface SinaisCliente {
   };
   seguranca?: {
     isWebdriver: boolean;
+    webdriverSpoofed?: boolean;
+    hasCdcArtifacts?: boolean;
+    isZeroDimension?: boolean;
+    isVirtualGpu?: boolean;
+    hasPluginsInconsistency?: boolean;
     isHeadless: boolean;
     hasTouch: boolean;
   };
+}
+
+export interface GpuVirtualResult {
+  isVirtual: boolean;
+  nome: string | null;
+  detalhes: string | null;
+}
+
+export interface LieDetectorResult {
+  adulterado: boolean;
+  motivos: string[];
+  confianca: number;
+}
+
+export interface TelefoneResult {
+  valido: boolean;
+  ddd: number | null;
+  uf: string | null;
+  isCelular: boolean;
+  isSpam: boolean;
+  tipoSpam: string | null;
+  motivoSpam: string | null;
+  isGratuito?: boolean;
 }
 
 export interface DeviceIdResult {
@@ -59,6 +87,9 @@ export interface ParecerRisco {
   detalhes: {
     documentoValido: boolean | null;
     emailAuditado: object | null;
+    telefoneAuditado?: TelefoneResult | null;
+    gpuVirtualAuditada?: GpuVirtualResult;
+    lieDetector?: LieDetectorResult;
     isHeadlessBot: boolean;
     isDatacenterConexao: boolean;
     totalFatoresAcionados: number;
@@ -72,8 +103,10 @@ export declare class AntiFraudePro {
   static hexParaUuid(hex64: string): string;
   static validarCpf(cpf: string): boolean;
   static validarCnpj(cnpj: string): boolean;
-  static analisarTelefone(telefone: string): { valido: boolean; ddd: number | null; uf: string | null; isCelular: boolean };
+  static analisarTelefone(telefone: string): TelefoneResult;
   static analisarEmail(email: string): { valido: boolean; descartavel: boolean; troll: boolean; dominio: string };
+  static verificarGpuVirtual(webglRenderer: string): GpuVirtualResult;
+  static executarLieDetector(sinais?: SinaisCliente): LieDetectorResult;
   static coletarSinaisNavegador(): Promise<SinaisCliente>;
   static gerarDeviceId(sinais?: SinaisCliente): DeviceIdResult;
   static checarVelocidade(chave: string, limiteTentativas?: number, janelaSegundos?: number): { violouVelocidade: boolean; totalRecente: number };
