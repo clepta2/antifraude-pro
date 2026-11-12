@@ -1,6 +1,7 @@
 /**
  * worker.js
  * Cloudflare Worker Anycast para AntiFraude Pro API
+ * Integrado nativamente à suíte de segurança Cloudflare Edge (Bot Management, JA3/JA4, Threat Score, Turnstile & Client Hints)
  * 
  * @license MIT
  * @see https://github.com/clepta2/antifraude-pro
@@ -11,7 +12,7 @@ import { AntiFraudePro } from './antifraude-pro.js';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, cf-turnstile-response',
   'Access-Control-Max-Age': '86400'
 };
 
@@ -38,7 +39,7 @@ function checkRateLimit(ip, limit = 120, windowMs = 60000) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env = {}, ctx) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/$/, '') || '/';
 
@@ -47,7 +48,7 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // 2. Extração de Sinais de Conexão na Borda Cloudflare
+    // 2. Extração Profunda de Telemetria Nativa da Borda Cloudflare
     const clientIp = request.headers.get('cf-connecting-ip') ||
       request.headers.get('x-forwarded-for') ||
       request.headers.get('x-real-ip') ||
@@ -73,7 +74,19 @@ export default {
     const city = cf.city || '';
     const userAgent = request.headers.get('user-agent') || '';
     const acceptLanguage = request.headers.get('accept-language') || 'pt-BR';
-    const isBotManagement = cf.botManagement && cf.botManagement.score < 30;
+    
+    // Telemetria Criptográfica e Heurística da Cloudflare
+    const httpProtocol = cf.httpProtocol || 'HTTP/3 (QUIC)';
+    const tlsCipher = cf.tlsCipher || '';
+    const tlsVersion = cf.tlsVersion || '';
+    const botScore = cf.botManagement ? cf.botManagement.score : (cf.clientTrustScore !== undefined ? cf.clientTrustScore : null);
+    const threatScore = cf.threatScore !== undefined ? cf.threatScore : (parseInt(request.headers.get('cf-threat-score') || '0', 10) || 0);
+    const ja3Hash = cf.botManagement?.ja3Hash || request.headers.get('cf-ja3-hash') || null;
+    const ja4 = cf.botManagement?.ja4 || null;
+    const secChUa = request.headers.get('sec-ch-ua') || '';
+    const secChUaPlatform = request.headers.get('sec-ch-ua-platform') || '';
+    const secChUaMobile = request.headers.get('sec-ch-ua-mobile') || '';
+    const secFetchSite = request.headers.get('sec-fetch-site') || '';
 
     const contextoRede = {
       ip: clientIp,
@@ -83,11 +96,29 @@ export default {
       estado: region,
       cidade: city,
       userAgent,
-      isHeadless: /HeadlessChrome|PhantomJS|Playwright|Puppeteer/i.test(userAgent) || isBotManagement,
+      protocolo: httpProtocol,
+      tlsCipher,
+      tlsVersion,
+      secChUa,
+      secChUaPlatform,
+      secChUaMobile,
+      secFetchSite,
+      cf: {
+        botScore,
+        threatScore,
+        ja3Hash,
+        ja4,
+        verifiedBot: cf.botManagement?.verifiedBot || false,
+        colo: cf.colo || 'LOCAL',
+        httpProtocol,
+        tlsCipher,
+        tlsVersion
+      },
+      isHeadless: /HeadlessChrome|PhantomJS|Playwright|Puppeteer/i.test(userAgent) || (botScore !== null && botScore < 30),
       isDatacenter: /amazon|google|microsoft|azure|digitalocean|hetzner|ovh|linode|oracle|cloudflare/i.test(asOrg)
     };
 
-    // 3. Rota de Saúde
+    // 3. Rota de Saúde & Telemetria do Cluster
     if (path === '/health' || path === '/api/antifraude/health') {
       return new Response(JSON.stringify({
         ok: true,
@@ -95,13 +126,19 @@ export default {
         version: AntiFraudePro.version,
         status: 'online',
         colo: cf.colo || 'LOCAL',
+        cloudflareIntegrations: {
+          botManagement: botScore !== null,
+          threatScoreEnabled: true,
+          ja3TlsFingerprint: ja3Hash !== null,
+          http3Quic: httpProtocol.includes('HTTP/3')
+        },
         timestamp: new Date().toISOString()
       }), {
         headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS }
       });
     }
 
-    // 4. Rota Rápida de Obtenção de DeviceId
+    // 4. Rota Expressa de DeviceId Determinístico
     if (path === '/api/device-id' || path === '/api/antifraude/device-id') {
       const semente = `${clientIp}||${userAgent}||${acceptLanguage}||${contextoRede.estado}`;
       const hash = AntiFraudePro.hashSha256(semente);
@@ -114,11 +151,15 @@ export default {
           provedor: asOrg,
           cidade: city,
           estado: region,
-          pais: country
+          pais: country,
+          colo: cf.colo || 'LOCAL',
+          protocolo: httpProtocol
         },
         seguranca: {
           isDatacenter: contextoRede.isDatacenter,
-          isHeadless: contextoRede.isHeadless
+          isHeadless: contextoRede.isHeadless,
+          botScore,
+          threatScore
         },
         timestamp: new Date().toISOString()
       }), {
@@ -126,7 +167,7 @@ export default {
       });
     }
 
-    // 5. Rota de Avaliação Completa de Transação e Fraude (POST /api/antifraude/analisar ou POST /api/antifraude/transacao)
+    // 5. Rota de Avaliação Completa de Transação e Fraude (POST /api/antifraude/analisar)
     if (
       path === '/api/antifraude/analisar' || path === '/api/antifraude/transacao' ||
       path === '/api/analisar-fraude' || path === '/api/transacao/analisar'
@@ -139,7 +180,6 @@ export default {
           body = {};
         }
       } else {
-        // Suporte a query params em GET para testes rápidos
         body = {
           valor: url.searchParams.get('valor') || 0,
           cpf: url.searchParams.get('cpf') || '',
@@ -148,14 +188,31 @@ export default {
         };
       }
 
-      // Merge de sinais enviados pelo cliente
+      // Verificação Cloudflare Turnstile (se token fornecido)
+      const turnstileToken = body.turnstileToken || request.headers.get('cf-turnstile-response');
+      let turnstileValido = null;
+      if (turnstileToken && env && env.TURNSTILE_SECRET_KEY) {
+        const turnstileResp = await AntiFraudePro.validarTurnstile(turnstileToken, env.TURNSTILE_SECRET_KEY, clientIp);
+        turnstileValido = turnstileResp.valido;
+      }
+
+      // Merge de sinais enviados pelo cliente com a telemetria Cloudflare
       const sinaisEnviados = body.sinais || {};
       const devInfo = AntiFraudePro.gerarDeviceId(sinaisEnviados);
 
       const contextoFinal = {
         ...contextoRede,
+        cf: {
+          ...contextoRede.cf,
+          botScore: body.botScore !== undefined ? body.botScore : contextoRede.cf.botScore,
+          threatScore: body.threatScore !== undefined ? body.threatScore : contextoRede.cf.threatScore
+        },
+        botScore: body.botScore !== undefined ? body.botScore : contextoRede.cf.botScore,
+        threatScore: body.threatScore !== undefined ? body.threatScore : contextoRede.cf.threatScore,
         deviceId: body.deviceId || devInfo.deviceId,
         sinais: sinaisEnviados,
+        biometria: body.biometria || sinaisEnviados.biometria,
+        turnstileValido,
         isHeadless: contextoRede.isHeadless || !!(sinaisEnviados.seguranca && sinaisEnviados.seguranca.isHeadless)
       };
 
@@ -166,7 +223,8 @@ export default {
         provedor: asOrg,
         cidade: city,
         estado: region,
-        pais: country
+        pais: country,
+        colo: cf.colo || 'LOCAL'
       };
 
       return new Response(JSON.stringify(resultado, null, 2), {

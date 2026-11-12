@@ -729,6 +729,112 @@ export class AntiFraudePro {
    * @param {object} contexto Sinais de rede e de cliente (ip, asn, provedor, deviceId, etc.)
    * @returns {object} Parecer completo com score 0-100, nível, recomendação e fatores
    */
+  /**
+   * Inicializa rastreador biométrico não-invasivo de digitação e movimentação no DOM.
+   * Não grava áudio, nem vídeo, nem texto digitado. Apenas intervalos temporais e física de movimento.
+   * @param {HTMLElement|string} [elementoOuSeletor] 
+   * @returns {{ obterTelemetria: () => object, destruir: () => void }}
+   */
+  static iniciarRastreamentoBiometrico(elementoOuSeletor) {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return { obterTelemetria: () => ({}), destruir: () => {} };
+    }
+    const container = typeof elementoOuSeletor === 'string' ? document.querySelector(elementoOuSeletor) : (elementoOuSeletor || document.body);
+    if (!container) return { obterTelemetria: () => ({}), destruir: () => {} };
+
+    const inicio = Date.now();
+    let movimentosMouse = 0;
+    let cliques = 0;
+    let pastes = 0;
+    let teclasPressionadas = 0;
+    const temposDwell = [];
+    let ultimoKeyDown = 0;
+    const posicoesMouse = [];
+
+    const onMouseMove = (e) => {
+      movimentosMouse++;
+      if (posicoesMouse.length < 50) {
+        posicoesMouse.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+      }
+    };
+    const onClick = () => cliques++;
+    const onPaste = () => pastes++;
+    const onKeyDown = () => {
+      ultimoKeyDown = Date.now();
+      teclasPressionadas++;
+    };
+    const onKeyUp = () => {
+      if (ultimoKeyDown > 0) {
+        temposDwell.push(Date.now() - ultimoKeyDown);
+        ultimoKeyDown = 0;
+      }
+    };
+
+    container.addEventListener('mousemove', onMouseMove, { passive: true });
+    container.addEventListener('click', onClick, { passive: true });
+    container.addEventListener('paste', onPaste, { passive: true });
+    container.addEventListener('keydown', onKeyDown, { passive: true });
+    container.addEventListener('keyup', onKeyUp, { passive: true });
+
+    return {
+      obterTelemetria: () => {
+        const agora = Date.now();
+        const dwellMedio = temposDwell.length > 0 ? (temposDwell.reduce((a, b) => a + b, 0) / temposDwell.length) : null;
+        return {
+          tempoPreenchimentoMs: agora - inicio,
+          movimentosMouse,
+          cliques,
+          pastes,
+          teclasDigitadas: teclasPressionadas,
+          dwellTimeMedioMs: dwellMedio ? Math.round(dwellMedio) : null,
+          hasTrajetoriaCurva: posicoesMouse.length >= 3
+        };
+      },
+      destruir: () => {
+        container.removeEventListener('mousemove', onMouseMove);
+        container.removeEventListener('click', onClick);
+        container.removeEventListener('paste', onPaste);
+        container.removeEventListener('keydown', onKeyDown);
+        container.removeEventListener('keyup', onKeyUp);
+      }
+    };
+  }
+
+  /**
+   * Valida token criptográfico do Cloudflare Turnstile junto à API oficial da Cloudflare
+   * @param {string} token Token recebido do widget cf-turnstile
+   * @param {string} secretKey Chave secreta Turnstile
+   * @param {string} [remoteIp] IP opcional do cliente
+   * @returns {Promise<{ valido: boolean, hostname?: string, erro?: string }>}
+   */
+  static async validarTurnstile(token, secretKey, remoteIp) {
+    if (!token || !secretKey) {
+      return { valido: false, erro: 'Token Turnstile ou Secret Key ausente' };
+    }
+    try {
+      const formData = new URLSearchParams();
+      formData.append('secret', secretKey);
+      formData.append('response', token);
+      if (remoteIp) formData.append('remoteip', remoteIp);
+
+      const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      });
+      const data = await resp.json();
+      return {
+        valido: !!data.success,
+        hostname: data.hostname,
+        action: data.action,
+        cdata: data.cdata,
+        erro: data['error-codes'] ? data['error-codes'].join(', ') : null
+      };
+    } catch (err) {
+      return { valido: false, erro: 'Falha na comunicação com a API Turnstile: ' + err.message };
+    }
+  }
+
   static avaliarTransacao(transacao = {}, contexto = {}) {
     const sinais = contexto.sinais || {};
     const seg = sinais.seguranca || {};
@@ -769,6 +875,94 @@ export class AntiFraudePro {
         ...dadosAdicionais
       });
     };
+
+    
+    // ─── AUDITORIA AVANÇADA NATIVA CLOUDFLARE EDGE (LAYER 3 & 4) ───
+    const cf = contexto.cf || contexto;
+
+    // 1. Cloudflare Bot Management Score (1 a 99)
+    if (cf.botScore !== undefined && cf.botScore !== null) {
+      const scoreCf = parseInt(cf.botScore, 10);
+      if (scoreCf < 30) {
+        aplicarRegra(
+          'CLOUDFLARE_BOT_SCORE_MALICIOSO',
+          65,
+          `Cloudflare Bot Management classificou a requisição como robô confirmado (Score: ${scoreCf}/99)`
+        );
+      } else if (scoreCf < 55) {
+        aplicarRegra(
+          'CLOUDFLARE_BOT_SCORE_SUSPEITO',
+          30,
+          `Cloudflare Bot Management classificou a requisição como tráfego suspeito/automatizado (Score: ${scoreCf}/99)`
+        );
+      }
+    }
+
+    // 2. Cloudflare Threat Score do IP (0 a 100)
+    if (cf.threatScore !== undefined && cf.threatScore !== null) {
+      const threat = parseInt(cf.threatScore, 10);
+      if (threat >= 50) {
+        aplicarRegra(
+          'CLOUDFLARE_IP_THREAT_CRITICO',
+          50,
+          `IP possui alto índice de ameaça e abuso recente na rede global da Cloudflare (Threat Score: ${threat}/100)`
+        );
+      } else if (threat >= 15) {
+        aplicarRegra(
+          'CLOUDFLARE_IP_THREAT_SUSPEITO',
+          25,
+          `IP reportado com histórico de tráfego nocivo ou varreduras recentes na Cloudflare (Threat Score: ${threat}/100)`
+        );
+      }
+    }
+
+    // 3. Inconsistência Criptográfica de Protocolo & Client Hints (Detecção de Bots Imitadores)
+    const protocoloHttp = (cf.protocolo || cf.httpProtocol || '').toUpperCase();
+    const userAgentRaw = (contexto.userAgent || cf.userAgent || '').toLowerCase();
+    const secChUa = contexto.secChUa || cf.secChUa || '';
+    
+    // Se o User-Agent afirma ser Chrome/Safari moderno (2024-2026), mas roda em HTTP/1.1 sem sec-ch-ua:
+    if (userAgentRaw.includes('chrome') && !userAgentRaw.includes('headless')) {
+      if (protocoloHttp === 'HTTP/1.1' && !secChUa && !contexto.isLocal) {
+        aplicarRegra(
+          'INCONSISTENCIA_PROTOCOLO_CLIENT_HINTS',
+          40,
+          'Cliente afirma ser Google Chrome moderno mas conectou via HTTP/1.1 legado sem cabeçalhos Sec-CH-UA (assinatura clássica de scripts Python/Curl)'
+        );
+      }
+    }
+
+    // 4. Biometria Comportamental (Dinâmica de Digitação e Movimento de Mouse)
+    const biometria = sinais.biometria || contexto.biometria;
+    if (biometria) {
+      // Injeção Instantânea sem Movimento Humano (Script / Automação)
+      if (biometria.tempoPreenchimentoMs !== undefined && biometria.tempoPreenchimentoMs < 250 && biometria.movimentosMouse === 0) {
+        aplicarRegra(
+          'BIOMETRIA_INJECAO_INSTANTANEA_ROBO',
+          45,
+          `Preenchimento instantâneo em ${biometria.tempoPreenchimentoMs}ms com zero movimentos de mouse físicos (injeção direta de payload por bot)`
+        );
+      } else if (biometria.teclasDigitadas > 10 && biometria.dwellTimeMedioMs !== undefined && biometria.dwellTimeMedioMs < 5) {
+        aplicarRegra(
+          'BIOMETRIA_DIGITACAO_SOBRE-HUMANA',
+          35,
+          `Velocidade de digitação incompatível com limites neuromotores humanos (Dwell Time: ${biometria.dwellTimeMedioMs}ms)`
+        );
+      }
+    }
+
+    // 5. Cloudflare Turnstile Verification Status
+    if (contexto.turnstileValido === false) {
+      aplicarRegra(
+        'CLOUDFLARE_TURNSTILE_FALHOU',
+        60,
+        'Desafio criptográfico Cloudflare Turnstile falhou ou foi rejeitado pela API'
+      );
+    } else if (contexto.turnstileValido === true) {
+      // Token Turnstile verificado com sucesso atenua falsos positivos
+      score = Math.max(0, score - 20);
+      avisos.push('Desafio criptográfico Cloudflare Turnstile validado com sucesso (-20 pts)');
+    }
 
     // 1. Lie Detector & Anti-Spoofing
     const lieDetector = AntiFraudePro.executarLieDetector(sinais);
@@ -945,6 +1139,15 @@ export class AntiFraudePro {
         lieDetector,
         isHeadlessBot: !!isHeadless,
         isDatacenterConexao: isDatacenter,
+        cloudflare: {
+          botScore: cf.botScore ?? null,
+          threatScore: cf.threatScore ?? 0,
+          ja3Hash: cf.ja3Hash || null,
+          ja4: cf.ja4 || null,
+          protocolo: protocoloHttp || 'HTTP/3 (QUIC)',
+          turnstileValido: contexto.turnstileValido ?? null
+        },
+        biometria: biometria || null,
         totalFatoresAcionados: fatores.length
       },
       timestamp: new Date().toISOString()

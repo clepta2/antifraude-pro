@@ -374,9 +374,28 @@
           </div>
         </div>
 
-        <div class="stat-box" style="margin-bottom:20px">
+        <div class="stat-box" style="margin-bottom:14px">
           <div class="stat-label"><i class="fas fa-vr-cardboard"></i> GPU / Renderizador WebGL</div>
           <div class="stat-val" id="dispGpu" style="font-size:0.92rem;color:var(--text-muted)">--</div>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:20px">
+          <div class="stat-box" style="border-left:3px solid #38bdf8">
+            <div class="stat-label"><i class="fas fa-cloud"></i> Cloudflare Bot Score</div>
+            <div class="stat-val" id="dispCfBotScore" style="color:#38bdf8">99 / 99 (Humano)</div>
+          </div>
+          <div class="stat-box" style="border-left:3px solid #10b981">
+            <div class="stat-label"><i class="fas fa-shield-virus"></i> IP Threat Score</div>
+            <div class="stat-val" id="dispCfThreat" style="color:#10b981">0 / 100 (Limpo)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-network-wired"></i> Protocolo HTTP &amp; TLS</div>
+            <div class="stat-val" id="dispCfProtocol" style="font-size:0.9rem">HTTP/3 (QUIC)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label"><i class="fas fa-server"></i> Borda Cloudflare Anycast</div>
+            <div class="stat-val" id="dispCfColo" style="font-size:0.9rem">GRU (São Paulo)</div>
+          </div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
@@ -409,6 +428,8 @@
           <button class="preset-btn" onclick="aplicarCenario('fraude')">🔴 4. Bot / Card Testing</button>
           <button class="preset-btn" onclick="aplicarCenario('spam0303')">🟣 5. Spam Telemarketing 0303</button>
           <button class="preset-btn" onclick="aplicarCenario('gpusoftware')">⚙️ 6. GPU Virtual SwiftShader</button>
+          <button class="preset-btn" onclick="aplicarCenario('cfbot')">☁️ 7. Cloudflare Bot Score &lt; 30</button>
+          <button class="preset-btn" onclick="aplicarCenario('biometria')">⚡ 8. Injeção de Script sem Mouse (0ms)</button>
         </div>
 
         <div class="grid-2">
@@ -542,11 +563,13 @@ fetch('/api/checkout', {
     import { AntiFraudePro } from '/antifraude-pro.js';
     window.AntiFraudePro = AntiFraudePro;
 
-    window.switchTab = function(tabId) {
+    window.switchTab = function(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      event.currentTarget.classList.add('active');
+      const content = document.getElementById(tabId);
+      if (content) content.classList.add('active');
+      const targetBtn = btn || (window.event && window.event.currentTarget) || document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+      if (targetBtn) targetBtn.classList.add('active');
     };
 
     let sinaisLocais = null;
@@ -575,6 +598,25 @@ fetch('/api/checkout', {
           botEl.style.color = 'var(--primary)';
         }
         document.getElementById('dispGpu').innerText = sinaisLocais.hashes?.webglRenderer || 'Desconhecido';
+
+        // Consulta telemetria real na Borda Cloudflare
+        try {
+          const respCf = await fetch('/api/antifraude/device-id');
+          if (respCf.ok) {
+            const dataCf = await respCf.json();
+            if (dataCf.rede) {
+              document.getElementById('dispCfProtocol').innerText = dataCf.rede.protocolo || 'HTTP/3 (QUIC)';
+              document.getElementById('dispCfColo').innerText = `${dataCf.rede.colo || 'LOCAL'} (${dataCf.rede.cidade || dataCf.rede.pais || 'Anycast'})`;
+            }
+            if (dataCf.seguranca) {
+              const bScore = dataCf.seguranca.botScore !== null ? dataCf.seguranca.botScore : 99;
+              document.getElementById('dispCfBotScore').innerText = `${bScore} / 99 (${bScore >= 30 ? 'Humano' : 'Robô'})`;
+              document.getElementById('dispCfThreat').innerText = `${dataCf.seguranca.threatScore || 0} / 100 (${(dataCf.seguranca.threatScore || 0) < 15 ? 'Limpo' : 'Suspeito'})`;
+            }
+          }
+        } catch (e) {
+          console.warn('Telemetria Cloudflare em fallback local:', e);
+        }
       } catch (e) {
         console.error('Erro ao carregar dispositivo:', e);
       }
@@ -586,9 +628,18 @@ fetch('/api/checkout', {
     };
 
     let simGpuVirtual = false;
+    let simCfBotScore = null;
+    let simBiometriaRobo = false;
+    let trackerBiometrico = null;
+
+    if (window.AntiFraudePro && typeof window.AntiFraudePro.iniciarRastreamentoBiometrico === 'function') {
+      trackerBiometrico = window.AntiFraudePro.iniciarRastreamentoBiometrico('body');
+    }
 
     window.aplicarCenario = function(tipo) {
       simGpuVirtual = (tipo === 'gpusoftware');
+      simCfBotScore = null;
+      simBiometriaRobo = false;
       if (tipo === 'legitimo') {
         document.getElementById('simValor').value = '249.90';
         document.getElementById('simCpf').value = '52998224725';
@@ -637,6 +688,24 @@ fetch('/api/checkout', {
         document.getElementById('simUfIp').value = 'SP';
         document.getElementById('simTipoRede').value = 'datacenter';
         document.getElementById('simBotCheck').checked = true;
+      } else if (tipo === 'cfbot') {
+        simCfBotScore = 14; // Cloudflare Bot Score crítico < 30
+        document.getElementById('simValor').value = '450.00';
+        document.getElementById('simCpf').value = '52998224725';
+        document.getElementById('simEmail').value = 'bot.crawler@servidor.com';
+        document.getElementById('simTelefone').value = '(11) 98765-4321';
+        document.getElementById('simUfIp').value = 'SP';
+        document.getElementById('simTipoRede').value = 'datacenter';
+        document.getElementById('simBotCheck').checked = true;
+      } else if (tipo === 'biometria') {
+        simBiometriaRobo = true; // Injeção instantânea sem movimento
+        document.getElementById('simValor').value = '890.00';
+        document.getElementById('simCpf').value = '52998224725';
+        document.getElementById('simEmail').value = 'rapido@gmail.com';
+        document.getElementById('simTelefone').value = '(11) 98765-4321';
+        document.getElementById('simUfIp').value = 'SP';
+        document.getElementById('simTipoRede').value = 'residencial';
+        document.getElementById('simBotCheck').checked = false;
       }
       calcularRisco();
     };
@@ -648,6 +717,10 @@ fetch('/api/checkout', {
         sinaisEnvio.hashes.webglRenderer = 'Google SwiftShader (LLVM 10.0)';
       }
 
+      const biometriaPayload = simBiometriaRobo
+        ? { tempoPreenchimentoMs: 40, movimentosMouse: 0, teclasDigitadas: 25, dwellTimeMedioMs: 1 }
+        : (trackerBiometrico ? trackerBiometrico.obterTelemetria() : { tempoPreenchimentoMs: 3200, movimentosMouse: 18, teclasDigitadas: 11, dwellTimeMedioMs: 85 });
+
       const payload = {
         valor: document.getElementById('simValor').value,
         cpf: document.getElementById('simCpf').value,
@@ -656,7 +729,13 @@ fetch('/api/checkout', {
         uf: document.getElementById('simUfIp').value,
         isDatacenter: document.getElementById('simTipoRede').value === 'datacenter',
         isHeadless: document.getElementById('simBotCheck').checked,
-        sinais: sinaisEnvio
+        botScore: simCfBotScore !== null ? simCfBotScore : undefined,
+        threatScore: simCfBotScore !== null ? 70 : 0,
+        biometria: biometriaPayload,
+        sinais: {
+          ...sinaisEnvio,
+          biometria: biometriaPayload
+        }
       };
 
       try {

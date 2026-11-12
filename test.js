@@ -136,6 +136,24 @@ AntiFraudePro.configurar({
 });
 const txWhitelist = AntiFraudePro.avaliarTransacao({ valor: 0.50 }, { ip: '10.0.0.1' });
 console.assert(txWhitelist.scoreRisco === 0, 'IP em whitelist deve retornar score 0');
-console.log('✅ 12. Motor Dinâmico de Whitelist & Calibração de Pesos OK\n');
+console.log('✅ 12. Motor Dinâmico de Whitelist & Calibração de Pesos OK');
+
+// 13. Teste de Cloudflare Bot Score & Threat Score Nativo
+const txCfBot = AntiFraudePro.avaliarTransacao({ valor: 250 }, {
+  cf: { botScore: 12, threatScore: 65, httpProtocol: 'HTTP/1.1' },
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'
+});
+console.assert(txCfBot.scoreRisco >= 80, 'Bot Score < 30 e Threat Score alto da Cloudflare devem levar a score crítico');
+console.assert(txCfBot.fatoresRisco.some(f => f.regra === 'CLOUDFLARE_BOT_SCORE_MALICIOSO'), 'Deve acionar regra de Bot Score da Cloudflare');
+console.assert(txCfBot.fatoresRisco.some(f => f.regra === 'CLOUDFLARE_IP_THREAT_CRITICO'), 'Deve acionar regra de Threat Score da Cloudflare');
+console.assert(txCfBot.fatoresRisco.some(f => f.regra === 'INCONSISTENCIA_PROTOCOLO_CLIENT_HINTS'), 'Deve acionar inconsistência de protocolo');
+console.log('✅ 13. Telemetria Criptográfica & Threat Intelligence Cloudflare OK');
+
+// 14. Teste de Biometria Comportamental (Injeção Instantânea sem Movimento)
+const txBiometriaRobo = AntiFraudePro.avaliarTransacao({ valor: 150 }, {
+  biometria: { tempoPreenchimentoMs: 45, movimentosMouse: 0, teclasDigitadas: 20, dwellTimeMedioMs: 1 }
+});
+console.assert(txBiometriaRobo.fatoresRisco.some(f => f.regra === 'BIOMETRIA_INJECAO_INSTANTANEA_ROBO'), 'Deve detectar injeção direta de payload por bot');
+console.log('✅ 14. Biometria Comportamental (Preenchimento Sobrenatural Detectado) OK\n');
 
 console.log('🎉 Todos os testes unitários do AntiFraude Pro passaram com 100% de sucesso!');
