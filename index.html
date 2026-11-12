@@ -678,7 +678,10 @@ fetch('/api/checkout', {
       carregarDevice();
     };
 
+    let simGpuVirtual = false;
+
     window.aplicarCenario = function(tipo) {
+      simGpuVirtual = (tipo === 'gpusoftware');
       if (tipo === 'legitimo') {
         document.getElementById('simValor').value = '249.90';
         document.getElementById('simCpf').value = '52998224725';
@@ -732,6 +735,11 @@ fetch('/api/checkout', {
     };
 
     window.calcularRisco = async function() {
+      const sinaisEnvio = sinaisLocais ? JSON.parse(JSON.stringify(sinaisLocais)) : {};
+      if (simGpuVirtual && sinaisEnvio.hashes) {
+        sinaisEnvio.hashes.webglRenderer = 'Google SwiftShader (LLVM 10.0)';
+      }
+
       const payload = {
         valor: document.getElementById('simValor').value,
         cpf: document.getElementById('simCpf').value,
@@ -740,7 +748,7 @@ fetch('/api/checkout', {
         uf: document.getElementById('simUfIp').value,
         isDatacenter: document.getElementById('simTipoRede').value === 'datacenter',
         isHeadless: document.getElementById('simBotCheck').checked,
-        sinais: sinaisLocais
+        sinais: sinaisEnvio
       };
 
       try {
