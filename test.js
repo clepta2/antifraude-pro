@@ -154,6 +154,66 @@ const txBiometriaRobo = AntiFraudePro.avaliarTransacao({ valor: 150 }, {
   biometria: { tempoPreenchimentoMs: 45, movimentosMouse: 0, teclasDigitadas: 20, dwellTimeMedioMs: 1 }
 });
 console.assert(txBiometriaRobo.fatoresRisco.some(f => f.regra === 'BIOMETRIA_INJECAO_INSTANTANEA_ROBO'), 'Deve detectar injeção direta de payload por bot');
-console.log('✅ 14. Biometria Comportamental (Preenchimento Sobrenatural Detectado) OK\n');
+console.log('✅ 14. Biometria Comportamental (Preenchimento Sobrenatural Detectado) OK');
 
-console.log('🎉 Todos os testes unitários do AntiFraude Pro passaram com 100% de sucesso!');
+// 15. Teste de Validação de Cartões de Crédito (Luhn Módulo 10, Matriz ISO & Sandboxes Fakes)
+const cartaoVisaValido = AntiFraudePro.validarCartao('4532015002830369'); // Visa com Luhn válido
+console.assert(cartaoVisaValido.luhnValido === true, 'Luhn do cartão Visa deve ser válido');
+console.assert(cartaoVisaValido.bandeira === 'VISA', 'Bandeira deve ser identificada como VISA');
+
+const cartaoEloValido = AntiFraudePro.validarCartao('5067000000000002'); // Elo com Luhn válido
+console.assert(cartaoEloValido.bandeira === 'ELO', 'Bandeira deve ser identificada como ELO');
+
+const cartaoLuhnInvalido = AntiFraudePro.validarCartao('4532015002830368'); // DV errado
+console.assert(cartaoLuhnInvalido.luhnValido === false, 'Luhn incorreto deve ser rejeitado');
+
+const cartaoStripeTeste = AntiFraudePro.validarCartao('4242424242424242'); // Stripe sandbox
+console.assert(cartaoStripeTeste.isTesteOuFake === true, 'Cartão 4242 da Stripe deve ser detectado como teste/fake');
+console.log('✅ 15. Validação de Cartões de Crédito (Luhn Módulo 10 & Matriz ISO) OK');
+
+// 16. Teste de Auditoria de Nome com Entropia de Shannon
+const nomeBom = AntiFraudePro.analisarNome('Carlos Eduardo da Silva');
+console.assert(nomeBom.valido === true && !nomeBom.suspeito, 'Nome completo legítimo deve passar');
+console.assert(nomeBom.entropia > 2.0, 'Entropia de nome humano deve ser equilibrada');
+
+const nomeIncompleto = AntiFraudePro.analisarNome('Carlos');
+console.assert(nomeIncompleto.suspeito === true, 'Nome de uma única palavra deve ser marcado como incompleto');
+
+const nomeTroll = AntiFraudePro.analisarNome('Teste da Silva Anonymous');
+console.assert(nomeTroll.suspeito === true, 'Nome com termos trolls deve ser barrado');
+console.log('✅ 16. Auditoria de Nome & Entropia de Shannon OK (Entropia:', nomeBom.entropia, ')');
+
+// 17. Teste de Carga Dinâmica de Domínios Descartáveis
+const totalAntes = AntiFraudePro.config.dominiosDescartaveisCustom.size;
+AntiFraudePro.carregarDominiosDescartaveis(['novoprovedor-fake-2026.xyz', 'temp-burner-bot.net']);
+console.assert(AntiFraudePro.config.dominiosDescartaveisCustom.has('novoprovedor-fake-2026.xyz'), 'Novo domínio deve ser inserido');
+const emailNovoFake = AntiFraudePro.analisarEmail('alvo@novoprovedor-fake-2026.xyz');
+console.assert(emailNovoFake.descartavel === true, 'E-mail do novo provedor deve ser identificado como descartável');
+console.log('✅ 17. Carga Dinâmica de Bases Descartáveis (Total ativo:', AntiFraudePro.config.dominiosDescartaveisCustom.size, ') OK');
+
+// 18. Teste de Presets de Perfil de Negócio (fintech, ecommerce, saas)
+const txFintech = AntiFraudePro.avaliarTransacao(
+  { valor: 500, cpf: '52998224725' },
+  { ip: '198.51.100.1', provedor: 'Amazon AWS Cloud Datacenter', perfil: 'fintech' }
+);
+console.assert(txFintech.perfilAplicado === 'fintech', 'Perfil fintech deve ser aplicado');
+console.assert(txFintech.fatoresRisco.some(f => f.regra === 'IP_DE_DATACENTER_CLOUD' && f.peso === 45), 'Peso calibrado da fintech deve ser acionado');
+console.log('✅ 18. Presets de Perfil de Negócio (Fintech / E-commerce / SaaS) OK');
+
+// 19. Teste de Conexão Internacional em Compra Nacional
+const txInternacional = AntiFraudePro.avaliarTransacao(
+  { valor: 150.00, cpf: '52998224725', moeda: 'BRL' },
+  { pais: 'RU', estado: 'MOW', ip: '95.173.136.1' } // IP da Rússia
+);
+console.assert(txInternacional.fatoresRisco.some(f => f.regra === 'IP_ESTRANGEIRO_COMPRA_NACIONAL'), 'Deve detectar conexão internacional em compra nacional');
+console.log('✅ 19. Alerta de Conexão Internacional em Compra Nacional BRL OK');
+
+// 20. Teste de Sanitizador W3C Anti-XSS e Anti-SQLi
+const payloadXss = '<script>alert("hack")</script><b>Produto Original</b>';
+const resSanitizacao = AntiFraudePro.sanitizarXss(payloadXss);
+console.assert(resSanitizacao.xssDetectado === true, 'XSS deve ser detectado');
+console.assert(!resSanitizacao.limpo.includes('<script>'), 'Script tag deve ser removida');
+console.assert(resSanitizacao.limpo.includes('<b>Produto Original</b>'), 'HTML seguro deve ser mantido');
+console.log('✅ 20. Higienizador W3C Anti-XSS & Anti-SQLi OK\n');
+
+console.log('🎉 Todos os 20 testes unitários do AntiFraude Pro passaram com 100% de sucesso!');

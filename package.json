@@ -1,8 +1,8 @@
 {
   "name": "antifraude-pro",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "type": "module",
-  "description": "SDK e API Oficial de Segurança, Detecção de Fraudes, Device Fingerprint Determinístico (Sem Cookies / LGPD Compliant), Lie Detector Anti-Spoofing, Detecção de GPU Virtual, Anti-Spam Telefônico ANATEL 0303/0304 e Score de Risco de Transações na Cloudflare Edge (<2ms).",
+  "description": "SDK e API Oficial de Segurança, Detecção de Fraudes, Validação de Cartões Luhn/ISO, Sincronização Semanal Dinâmica de E-mails Descartáveis no R2, Device Fingerprint Determinístico (Sem Cookies / LGPD Compliant), Lie Detector Anti-Spoofing, Detecção de GPU Virtual, Anti-Spam Telefônico ANATEL 0303/0304 e Score de Risco na Cloudflare Edge (<2ms).",
   "main": "antifraude-pro.js",
   "module": "antifraude-pro.js",
   "types": "types/index.d.ts",

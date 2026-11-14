@@ -75,6 +75,34 @@ export interface FatorRisco {
   descricao: string;
 }
 
+export interface CartaoResult {
+  valido: boolean;
+  luhnValido: boolean;
+  bandeira: string;
+  isTesteOuFake: boolean;
+  bin: string;
+  ultimosQuatro: string;
+  mascara: string;
+  motivo: string | null;
+}
+
+export interface NomeResult {
+  valido: boolean;
+  suspeito: boolean;
+  palavras: number;
+  entropia: number;
+  motivos: string[];
+  motivo: string | null;
+}
+
+export interface SanitizacaoResult {
+  original: string;
+  limpo: string;
+  xssDetectado: boolean;
+  sqliDetectado: boolean;
+  payloadLimpo: boolean;
+}
+
 export interface ParecerRisco {
   ok: boolean;
   scoreRisco: number;
@@ -82,12 +110,15 @@ export interface ParecerRisco {
   recomendacao: 'aprovar' | 'desafio_2fa' | 'analise_manual' | 'bloquear';
   corBadge: string;
   deviceId: string;
+  perfilAplicado?: string;
   fatoresRisco: FatorRisco[];
   avisos: string[];
   detalhes: {
     documentoValido: boolean | null;
     emailAuditado: object | null;
     telefoneAuditado?: TelefoneResult | null;
+    cartaoAuditado?: CartaoResult | null;
+    nomeTitularAuditado?: NomeResult | null;
     gpuVirtualAuditada?: GpuVirtualResult;
     lieDetector?: LieDetectorResult;
     isHeadlessBot: boolean;
@@ -125,6 +156,9 @@ export interface RegraCustomizada {
 export declare class AntiFraudePro {
   static get version(): string;
   static config: AntiFraudeConfig;
+  static PERFIS: Record<string, any>;
+  static aplicarPerfil(nome: 'ecommerce' | 'fintech' | 'saas'): AntiFraudeConfig;
+  static carregarDominiosDescartaveis(lista: string[]): number;
   static configurar(opcoes?: AntiFraudeConfig): AntiFraudeConfig;
   static adicionarRegra(regra: RegraCustomizada): void;
   static resetarConfiguracao(): void;
@@ -132,8 +166,11 @@ export declare class AntiFraudePro {
   static hexParaUuid(hex64: string): string;
   static validarCpf(cpf: string): boolean;
   static validarCnpj(cnpj: string): boolean;
+  static validarCartao(numero: string): CartaoResult;
+  static analisarNome(nome: string): NomeResult;
+  static sanitizarXss(input: string): SanitizacaoResult;
   static analisarTelefone(telefone: string): TelefoneResult;
-  static analisarEmail(email: string): { valido: boolean; descartavel: boolean; troll: boolean; dominio: string };
+  static analisarEmail(email: string): { valido: boolean; descartavel: boolean; troll: boolean; dominio: string; usuario: string; entropia: number };
   static verificarGpuVirtual(webglRenderer: string): GpuVirtualResult;
   static executarLieDetector(sinais?: SinaisCliente): LieDetectorResult;
   static coletarSinaisNavegador(): Promise<SinaisCliente>;

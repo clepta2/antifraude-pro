@@ -117,7 +117,7 @@ if (resultado.recomendacao === 'bloquear') {
 | **0 – 24** | **Baixo Risco** | 🟢 Verde | **Aprovar Automaticamente** | Dados autênticos, IP residencial, navegador legítimo |
 | **25 – 54** | **Médio Risco** | 🟡 Amarelo | **Exigir Confirmação 2FA / WhatsApp** | DDD do telefone divergente da localização do IP |
 | **55 – 79** | **Alto Risco** | 🟠 Laranja | **Encaminhar para Análise Manual** | E-mail temporário/descartável, IP de VPN |
-| **80 – 100** | **Risco Crítico** | 🔴 Vermelho | **Bloquear Transação Imediatamente** | Bot headless, CPF fraudulento, micro-valor de card testing |
+| **80 – 100** | **Risco Crítico** | 🔴 Vermelho | **Bloquear Transação Imediatamente** | Bot headless, CPF fraudulento, micro-valor de card testing, cartão de teste |
 
 ---
 
@@ -125,25 +125,45 @@ if (resultado.recomendacao === 'bloquear') {
 
 | Regra | Penalidade | Descrição |
 | :--- | :---: | :--- |
+| `CARTAO_TESTE_OU_GERADOR_FAKE` | **+60 pts** | Número de cartão pertencente a sandbox de teste conhecido ou gerador fake |
 | `TENTATIVA_EVASAO_STEALTH_SPOOFING` | **+50 pts** | Lie Detector: Manipulação de prototype (`navigator.webdriver`) ou artefatos CDP |
 | `ROBO_HEADLESS_DETECTADO` | **+45 pts** | Navegador automatizado (Puppeteer, Selenium, Playwright) |
+| `CARTAO_LUHN_INVALIDO` | **+40 pts** | Falha na verificação matemática de integridade do cartão (Luhn / Módulo 10) |
 | `TELEFONE_SPAM_ANATEL` | **+40 pts** | Prefixo oficial 0303 (Telemarketing) ou 0304 (Cobrança Ativa) |
 | `GPU_VIRTUAL_EMULADA_OU_SOFTWARE` | **+35 pts** | Renderizador de software virtual (Google SwiftShader, llvmpipe, Mesa) |
 | `IP_DE_DATACENTER_CLOUD` | **+30 pts** | Conexão vinda de VPS/Nuvem (AWS, GCP, DigitalOcean, Oracle) |
 | `ALTA_VELOCIDADE_TENTATIVAS_DEVICE` | **+30 pts** | Múltiplas tentativas de pagamento por minuto no mesmo aparelho |
+| `IP_ESTRANGEIRO_COMPRA_NACIONAL` | **+25 pts** | Transação nacional em BRL ou com CPF originada de IP estrangeiro |
 | `CPF_MATEMATICAMENTE_INVALIDO` | **+25 pts** | Dígitos verificadores do CPF falsos ou inexistentes |
-| `EMAIL_DESCARTAVEL_TEMPORARIO` | **+25 pts** | E-mail pertencente a provedores de descarte (Yopmail, TempMail) |
-| `EMAIL_PADRAO_TROLL_SUSPEITO` | **+20 pts** | E-mail com padrões zombeteiros ou gerados por scripts |
+| `EMAIL_DESCARTAVEL_TEMPORARIO` | **+25 pts** | E-mail pertencente a provedores de descarte (atualizado semanalmente no R2) |
+| `EMAIL_PADRAO_TROLL_SUSPEITO` | **+20 pts** | E-mail com padrões zombeteiros ou baixa entropia de Shannon |
+| `NOME_TITULAR_SUSPEITO_OU_INCOMPLETO` | **+15 pts** | Nome de uma palavra só, sem sobrenome, ou com caracteres repetidos |
 | `VALOR_MICRO_CARD_TESTING` | **+15 pts** | Valor atipicamente baixo (≤ R$ 1,00) característico de teste de cartão |
 | `DDD_DIVERGENTE_DA_LOCALIZACAO_IP` | **+15 pts** | DDD do telefone difere geograficamente do Estado do IP |
 
 ---
 
-## 🌐 Endpoints REST na Nuvem (Ponte APIs)
+## ⏰ Sincronização Semanal Dinâmica via Cron Trigger & Cloudflare R2
 
-- `POST https://ponte.ozpro.com.br/api/antifraude/analisar` — Avaliação completa de transação
-- `GET https://ponte.ozpro.com.br/api/antifraude/device-id` — Obtenção expressa de DeviceId
-- `GET https://ponte.ozpro.com.br/api/antifraude/health` — Telemetria operacional do serviço
+O serviço conta com um **Cron Trigger** configurado no Cloudflare Workers (`0 3 * * 1` — toda segunda-feira às 03:00 UTC):
+1. Faz o download do catálogo oficial aberto mais recente de domínios descartáveis (`disposable-email-domains` com mais de 3.500 domínios).
+2. Salva um snapshot atualizado no bucket **Cloudflare R2** (`ozpro-antifraude/listas/disposable-domains.json`).
+3. Alimenta a memória RAM ativa do motor na borda, mantendo a consulta em tempo constante `O(1)`.
+4. Pode ser disparado manualmente a qualquer momento via `POST /api/antifraude/sync`.
+
+---
+
+## 🌐 Endpoints REST na Nuvem (Cloudflare Edge Anycast)
+
+- `POST https://antifraude.ozpro.com.br/api/antifraude/analisar` — Avaliação completa de transação
+- `POST https://antifraude.ozpro.com.br/api/antifraude/cartao` — Validação expressa de cartão (Luhn + Bandeira + Teste)
+- `GET https://antifraude.ozpro.com.br/api/antifraude/telefone?numero={num}` — Validação ANATEL 0303/0304
+- `GET https://antifraude.ozpro.com.br/api/antifraude/email?email={email}` — Validação de e-mail e descartáveis
+- `GET https://antifraude.ozpro.com.br/api/reputacao-ip?ip={ip}` — Auditoria de ASN, VPS, Datacenter e ameaças
+- `POST https://antifraude.ozpro.com.br/api/sanitizar-xss` — Higienizador W3C Anti-XSS e Anti-SQLi
+- `GET https://antifraude.ozpro.com.br/api/antifraude/device-id` — Obtenção expressa de DeviceId (Zero Cookies)
+- `POST https://antifraude.ozpro.com.br/api/antifraude/sync` — Sincronização manual de bases
+- `GET https://antifraude.ozpro.com.br/api/antifraude/health` — Telemetria operacional do serviço e status do Cron
 
 ---
 

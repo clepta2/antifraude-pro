@@ -116,6 +116,108 @@ const DEFAULT_SOFTWARE_GPU_PATTERNS = [
 // ─── PADRÕES SEMÂNTICOS DE E-MAILS DESCARTÁVEIS (PEGA MILHARES DE FORMA DINÂMICA) ───
 const PADRAO_DOMINIO_DESCARTAVEL = /(temp|dispos|throwaway|trash|burner|dropmail|fakeinbox|guerrilla|10min|minute|mailinator|yopmail|mohmal|sharklaser|sharklasers|mytemp|inboxbear|crazymail)/i;
 
+// ─── BASE SEED DE DOMÍNIOS DESCARTÁVEIS (DISPOSABLE EMAIL DOMAINS) ───
+const DOMINIOS_DESCARTAVEIS_BASE = new Set([
+  'yopmail.com', 'yopmail.fr', 'yopmail.net', 'cool.fr.nf', 'jetable.fr.nf',
+  'mailinator.com', 'mailinator2.com', 'suremail.info', 'guerrillamail.com',
+  'guerrillamail.net', 'guerrillamail.org', 'guerrillamailblock.com', 'sharklasers.com',
+  'grr.la', 'pokemail.net', 'spam4.me', 'tempmail.com', 'temp-mail.org',
+  '10minutemail.com', '10minutemail.net', '10minmail.com', 'throwawaymail.com',
+  'trashmail.com', 'trashmail.net', 'trashmail.me', 'dispostable.com',
+  'dropmail.me', 'fakeinbox.com', 'getairmail.com', 'mohmal.com',
+  'inboxbear.com', 'crazymailing.com', 'mytemp.email', 'tempail.com',
+  'burnermail.io', 'nada.ltd', 'generator.email', 'emailondeck.com',
+  'getnada.com', 'abacusmail.com', 'minuteinbox.com', 'tempinbox.com',
+  'fakemailgenerator.com', 'maildrop.cc', 'dayrep.com', 'teleworm.us',
+  'armyspy.com', 'cuvox.de', 'fleckens.hu', 'gustr.com', 'jourrapide.com',
+  'rhyta.com', 'superrito.com', 'einrot.com', 'mytempemail.com', 'maildrop.net'
+]);
+
+// ─── ENTROPIA DA TEORIA DA INFORMAÇÃO DE SHANNON (ANÁLISE ESTATÍSTICA DE STRINGS) ───
+function calcularEntropia(str) {
+  if (!str || typeof str !== 'string') return 0;
+  const s = str.toLowerCase().replace(/\s+/g, '');
+  if (s.length === 0) return 0;
+  const freq = {};
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    freq[c] = (freq[c] || 0) + 1;
+  }
+  let h = 0;
+  for (const c in freq) {
+    const p = freq[c] / s.length;
+    h -= p * Math.log2(p);
+  }
+  return h;
+}
+
+// ─── ALGORITMO DE LUHN (MÓDULO 10) & MATRIZ ISO/IEC 7812 DE BANDEIRAS DE CARTÃO ───
+const CARTAO_TESTE_PATTERNS = [
+  /^4111111111111111$/,
+  /^4242424242424242$/,
+  /^4000000000000002$/,
+  /^5555555555554444$/,
+  /^378282246310005$/,
+  /^371449635398431$/,
+  /^(\d)\1{12,18}$/
+];
+
+function validarLuhn(numeroLimpo) {
+  if (numeroLimpo.length < 13 || numeroLimpo.length > 19) return false;
+  let soma = 0;
+  let dobrar = false;
+  for (let i = numeroLimpo.length - 1; i >= 0; i--) {
+    let digito = parseInt(numeroLimpo.charAt(i), 10);
+    if (dobrar) {
+      digito *= 2;
+      if (digito > 9) digito -= 9;
+    }
+    soma += digito;
+    dobrar = !dobrar;
+  }
+  return soma % 10 === 0;
+}
+
+function identificarBandeira(num) {
+  // Elo (padrão nacional brasileiro homologado)
+  if (/^(4011(78|79)|43(1274|8935)|45(1416|7393|763(1|2))|50(4175|6699|67[0-7][0-9]|90[0-9]{2})|627780|636297|636368|65003[1-3]|6500(3[5-9]|[4-5][0-9])|6504(0[5-9]|[1-3][0-9])|65048[5-9]|65049[0-9]|6505[0-2][0-9]|65053[0-8]|65054[1-9]|6505[5-8][0-9]|65059[0-8]|6507(0[0-9]|1[0-8])|65072[0-7]|6509(0[1-9]|[1-6][0-9]|7[0-8])|6516(5[2-9]|[6-7][0-9])|6550([0-1][0-9]|2[1-9]|[3-4][0-9]|5[0-8]))/.test(num)) {
+    return 'ELO';
+  }
+  // Hipercard
+  if (/^(606282|384100|384140|384160)/.test(num)) {
+    return 'HIPERCARD';
+  }
+  // Visa
+  if (/^4[0-9]{12}(?:[0-9]{3})?(?:[0-9]{3})?$/.test(num)) {
+    return 'VISA';
+  }
+  // Mastercard
+  if (/^(5[1-5][0-9]{14}|2(22[1-9][0-9]{12}|2[3-9][0-9]{13}|[3-6][0-9]{14}|7[0-1][0-9]{13}|720[0-9]{12}))$/.test(num)) {
+    return 'MASTERCARD';
+  }
+  // American Express
+  if (/^3[47][0-9]{13}$/.test(num)) {
+    return 'AMEX';
+  }
+  // Diners Club
+  if (/^3(?:0[0-5]|[68][0-9])[0-9]{11}$/.test(num)) {
+    return 'DINERS';
+  }
+  // Discover
+  if (/^6(?:011|5[0-9]{2})[0-9]{12}$/.test(num)) {
+    return 'DISCOVER';
+  }
+  // JCB
+  if (/^(?:2131|1800|35\d{3})\d{11}$/.test(num)) {
+    return 'JCB';
+  }
+  // Cabal
+  if (/^(60420[1-9]|6042[1-9][0-9]|6043[0-9]{2}|604400)/.test(num)) {
+    return 'CABAL';
+  }
+  return null;
+}
+
 // ─── MAPA OFICIAL DOS 67 DDDs E RESPECTIVAS UFs (ANATEL) ───
 const DDD_PARA_UF = {
   11: 'SP', 12: 'SP', 13: 'SP', 14: 'SP', 15: 'SP', 16: 'SP', 17: 'SP', 18: 'SP', 19: 'SP',
@@ -163,16 +265,78 @@ export class AntiFraudePro {
     pesosSobrescritos: {},
     regrasDesabilitadas: new Set(),
     regrasCustomizadas: [],
-    dominiosDescartaveisCustom: new Set(),
+    dominiosDescartaveisCustom: new Set(DOMINIOS_DESCARTAVEIS_BASE),
     whitelistIps: new Set(),
     whitelistDeviceIds: new Set()
+  };
+
+  /**
+   * Presets oficiais de sensibilidade por modelo de negócio
+   */
+  static PERFIS = {
+    ecommerce: {
+      faixas: { critico: 80, alto: 55, medio: 25 },
+      pesos: {
+        ROBO_HEADLESS_DETECTADO: 45,
+        CARTAO_LUHN_INVALIDO: 40,
+        CARTAO_TESTE_OU_GERADOR_FAKE: 60,
+        VALOR_MICRO_CARD_TESTING: 20
+      }
+    },
+    fintech: {
+      faixas: { critico: 70, alto: 45, medio: 20 },
+      pesos: {
+        IP_DE_DATACENTER_CLOUD: 45,
+        IP_ESTRANGEIRO_COMPRA_NACIONAL: 40,
+        ROBO_HEADLESS_DETECTADO: 50,
+        CPF_MATEMATICAMENTE_INVALIDO: 40
+      }
+    },
+    saas: {
+      faixas: { critico: 85, alto: 60, medio: 30 },
+      pesos: {
+        EMAIL_DESCARTAVEL_TEMPORARIO: 45,
+        ROBO_HEADLESS_DETECTADO: 50,
+        IP_DE_DATACENTER_CLOUD: 15
+      }
+    }
   };
 
   /**
    * Versão oficial do motor AntiFraude Pro
    */
   static get version() {
-    return '1.2.0';
+    return '1.3.0';
+  }
+
+  /**
+   * Aplica um preset de sensibilidade de negócio (ecommerce, fintech, saas)
+   * @param {'ecommerce'|'fintech'|'saas'} nome 
+   */
+  static aplicarPerfil(nome) {
+    const perfil = this.PERFIS[nome];
+    if (perfil) {
+      if (perfil.faixas) Object.assign(this.config.faixas, perfil.faixas);
+      if (perfil.pesos) Object.assign(this.config.pesosSobrescritos, perfil.pesos);
+    }
+    return this.config;
+  }
+
+  /**
+   * Carrega uma lista de domínios descartáveis externa (ex: sync do GitHub / R2)
+   * @param {string[]} lista 
+   * @returns {number} Quantidade total de domínios cadastrados
+   */
+  static carregarDominiosDescartaveis(lista = []) {
+    if (Array.isArray(lista)) {
+      for (let i = 0; i < lista.length; i++) {
+        const d = String(lista[i]).toLowerCase().trim();
+        if (d && !d.startsWith('#')) {
+          this.config.dominiosDescartaveisCustom.add(d);
+        }
+      }
+    }
+    return this.config.dominiosDescartaveisCustom.size;
   }
 
   /**
@@ -223,7 +387,7 @@ export class AntiFraudePro {
     this.config.pesosSobrescritos = {};
     this.config.regrasDesabilitadas.clear();
     this.config.regrasCustomizadas = [];
-    this.config.dominiosDescartaveisCustom.clear();
+    this.config.dominiosDescartaveisCustom = new Set(DOMINIOS_DESCARTAVEIS_BASE);
     this.config.whitelistIps.clear();
     this.config.whitelistDeviceIds.clear();
   }
@@ -382,43 +546,147 @@ export class AntiFraudePro {
   }
 
   /**
-   * Analisa e-mail detectando descarte, sintaxe e padrões trolls de forma algorítmica
+   * Analisa e-mail detectando descarte, sintaxe e padrões trolls de forma algorítmica e por listas dinâmicas
    * @param {string} email 
-   * @returns {{ valido: boolean, descartavel: boolean, troll: boolean, dominio: string }}
+   * @returns {{ valido: boolean, descartavel: boolean, troll: boolean, dominio: string, usuario: string, entropia: number }}
    */
   static analisarEmail(email) {
     if (!email || typeof email !== 'string') {
-      return { valido: false, descartavel: false, troll: false, dominio: '' };
+      return { valido: false, descartavel: false, troll: false, dominio: '', usuario: '', entropia: 0, motivo: 'E-mail ausente' };
     }
 
     const clean = email.trim().toLowerCase();
     const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!regex.test(clean)) {
-      return { valido: false, descartavel: false, troll: false, dominio: '' };
+      return { valido: false, descartavel: false, troll: false, dominio: '', usuario: '', entropia: 0, motivo: 'Formato RFC 5322 inválido' };
     }
 
     const partes = clean.split('@');
     const usuario = partes[0] || '';
     const dominio = partes[1] || '';
 
-    // Detecção dinâmica de descartável: regex de padrão de domínio temporário + lista customizada
-    const descartavel = PADRAO_DOMINIO_DESCARTAVEL.test(dominio) ||
-      this.config.dominiosDescartaveisCustom.has(dominio);
+    // 1. Detecção dinâmica de descartável: Base Set O(1) + regex de padrão temporário + lista carregada no R2
+    const descartavel = this.config.dominiosDescartaveisCustom.has(dominio) ||
+      DOMINIOS_DESCARTAVEIS_BASE.has(dominio) ||
+      PADRAO_DOMINIO_DESCARTAVEL.test(dominio);
 
-    // Detecção dinâmica de usuário troll
-    const troll = usuario.includes('suamae') ||
-      usuario.includes('aquelaursa') ||
-      usuario.includes('naotem') ||
-      usuario.includes('naoquero') ||
-      usuario.includes('testetestando') ||
-      /^(.)\1{3,}/.test(usuario) ||
-      /^(asdf|qwerty|123456|test|teste)/.test(usuario);
+    // 2. Análise Heurística de Entropia de Shannon e Padrões Estatísticos no Usuário
+    const entropiaUser = calcularEntropia(usuario);
+    const repeticaoChars = /(.)\1{3,}/.test(usuario);
+    const trollPadrao = /^(asdf|qwerty|123456|test|teste|fake|hacker|suamae|aquelaursa|naotem|naoquero)/i.test(usuario);
+    const troll = trollPadrao || repeticaoChars || (usuario.length >= 6 && entropiaUser < 1.5);
 
     return {
       valido: true,
       descartavel,
       troll,
-      dominio
+      dominio,
+      usuario,
+      entropia: Math.round(entropiaUser * 100) / 100
+    };
+  }
+
+  /**
+   * Valida cartão de crédito com algoritmo de Luhn (Módulo 10), matriz ISO de bandeiras e cartões de teste
+   * @param {string} numero Número completo ou parcial (PAN)
+   * @returns {{ valido: boolean, luhnValido: boolean, bandeira: string, isTesteOuFake: boolean, bin: string, ultimosQuatro: string, mascara: string, motivo: string|null }}
+   */
+  static validarCartao(numero) {
+    if (!numero) {
+      return { valido: false, luhnValido: false, bandeira: 'DESCONHECIDA', isTesteOuFake: false, bin: '', ultimosQuatro: '', mascara: '', motivo: 'Número ausente' };
+    }
+    const limpo = String(numero).replace(/\D/g, '');
+    if (limpo.length < 13 || limpo.length > 19) {
+      return { valido: false, luhnValido: false, bandeira: 'DESCONHECIDA', isTesteOuFake: false, bin: limpo.slice(0, 6), ultimosQuatro: limpo.slice(-4), mascara: '', motivo: 'Comprimento inválido para cartão de crédito' };
+    }
+
+    const isTeste = CARTAO_TESTE_PATTERNS.some(p => p.test(limpo));
+    const luhn = validarLuhn(limpo);
+    const bandeira = identificarBandeira(limpo) || 'OUTRA';
+    const valido = luhn && !isTeste;
+
+    return {
+      valido,
+      luhnValido: luhn,
+      bandeira,
+      isTesteOuFake: isTeste,
+      bin: limpo.slice(0, 6),
+      ultimosQuatro: limpo.slice(-4),
+      mascara: `${limpo.slice(0, 4)} **** **** ${limpo.slice(-4)}`,
+      motivo: isTeste ? 'Cartão de teste ou sandbox identificado' : (!luhn ? 'Dígito verificador de Luhn inválido' : null)
+    };
+  }
+
+  /**
+   * Analisa nome de titular detectando nomes incompletos, trolls ou gerados via entropia de Shannon
+   * @param {string} nome 
+   * @returns {{ valido: boolean, suspeito: boolean, palavras: number, entropia: number, motivos: string[], motivo: string|null }}
+   */
+  static analisarNome(nome) {
+    if (!nome || typeof nome !== 'string') {
+      return { valido: false, suspeito: true, palavras: 0, entropia: 0, motivos: ['Nome ausente'], motivo: 'Nome ausente' };
+    }
+    const limpo = nome.trim().replace(/\s+/g, ' ');
+    const partes = limpo.split(' ');
+    const totalPalavras = partes.length;
+    const entropia = calcularEntropia(limpo);
+    const semEspaco = limpo.toLowerCase().replace(/[^a-z]/g, '');
+    const vogais = semEspaco.replace(/[^aeiou]/g, '').length;
+    const razaoVogais = semEspaco.length > 0 ? (vogais / semEspaco.length) : 0;
+
+    const motivos = [];
+    if (totalPalavras < 2) {
+      motivos.push('Nome incompleto sem sobrenome');
+    }
+    if (/(.)\1{3,}/i.test(limpo)) {
+      motivos.push('Sequência de caracteres repetidos no nome');
+    }
+    if (semEspaco.length >= 6 && (razaoVogais < 0.15 || razaoVogais > 0.85)) {
+      motivos.push('Proporção anormal de vogais/consoantes (texto sintético)');
+    }
+    if (semEspaco.length >= 7 && entropia < 1.6) {
+      motivos.push('Entropia de Shannon muito baixa (baixa variação de caracteres)');
+    }
+    const trollRegex = /(teste|test|admin|root|anonimo|anonymous|nao sei|fake|fraude|hacker|bot|null|undefined|usuario)/i;
+    if (trollRegex.test(limpo)) {
+      motivos.push('Nome contém termos zombeteiros ou de teste');
+    }
+
+    const suspeito = motivos.length > 0;
+    return {
+      valido: !suspeito && totalPalavras >= 2,
+      suspeito,
+      palavras: totalPalavras,
+      entropia: Math.round(entropia * 100) / 100,
+      motivos,
+      motivo: motivos[0] || null
+    };
+  }
+
+  /**
+   * Higienizador de payloads W3C Anti-XSS e Anti-SQLi
+   * @param {string} input 
+   * @returns {{ original: string, limpo: string, xssDetectado: boolean, sqliDetectado: boolean, payloadLimpo: boolean }}
+   */
+  static sanitizarXss(input) {
+    if (typeof input !== 'string') return { original: input, limpo: input, xssDetectado: false, sqliDetectado: false, payloadLimpo: true };
+    const xssDetectado = /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>|javascript:|onload=|onerror=|onclick=|onmouseover=|<iframe|<embed|<object/i.test(input);
+    const sqliDetectado = /('|\b)(union(\s+all)?\s+select|select\s+.*\s+from|insert\s+into|drop\s+table|delete\s+from|update\s+.*\s+set|or\s+1\s*=\s*1|--|\/\*)/i.test(input);
+
+    const limpo = input
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/javascript:[^"']*/gi, '')
+      .replace(/\bon\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/<embed\b[^>]*>/gi, '')
+      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+
+    return {
+      original: input,
+      limpo,
+      xssDetectado,
+      sqliDetectado,
+      payloadLimpo: !xssDetectado && !sqliDetectado
     };
   }
 
@@ -863,10 +1131,21 @@ export class AntiFraudePro {
     const fatores = [];
     const avisos = [];
 
+    // 0.1 Aplicação Dinâmica de Perfil de Negócio (ecommerce, fintech, saas)
+    const perfilNome = transacao.perfil || contexto.perfil;
+    const faixas = { ...this.config.faixas };
+    if (perfilNome && AntiFraudePro.PERFIS[perfilNome]) {
+      const p = AntiFraudePro.PERFIS[perfilNome];
+      if (p.faixas) Object.assign(faixas, p.faixas);
+    }
+
     // Helper dinâmico para aplicar regra com peso customizável ou sobrescrito
     const aplicarRegra = (idRegra, pesoPadrao, descricao, dadosAdicionais = {}) => {
       if (this.config.regrasDesabilitadas.has(idRegra)) return;
-      const pesoFinal = this.config.pesosSobrescritos[idRegra] !== undefined ? this.config.pesosSobrescritos[idRegra] : pesoPadrao;
+      let pesoFinal = this.config.pesosSobrescritos[idRegra] !== undefined ? this.config.pesosSobrescritos[idRegra] : pesoPadrao;
+      if (perfilNome && AntiFraudePro.PERFIS[perfilNome]?.pesos?.[idRegra] !== undefined && this.config.pesosSobrescritos[idRegra] === undefined) {
+        pesoFinal = AntiFraudePro.PERFIS[perfilNome].pesos[idRegra];
+      }
       score += pesoFinal;
       fatores.push({
         regra: idRegra,
@@ -1078,7 +1357,40 @@ export class AntiFraudePro {
       aplicarRegra('VALOR_MICRO_CARD_TESTING', 15, 'Valor muito baixo (R$ 1,00 ou menos) característico de teste de cartão de crédito roubado');
     }
 
-    // 10. Execução de Regras Customizadas Injetadas Dinamicamente
+    // 10. Auditoria de Cartão de Crédito (Luhn Módulo 10, Matriz ISO de Bandeiras & Sandboxes Fakes)
+    const numCartao = transacao.cartao || transacao.numeroCartao || transacao.pan || transacao.card;
+    let auditCartao = null;
+    if (numCartao) {
+      auditCartao = AntiFraudePro.validarCartao(numCartao);
+      if (auditCartao.isTesteOuFake) {
+        aplicarRegra('CARTAO_TESTE_OU_GERADOR_FAKE', 60, auditCartao.motivo || 'Número de cartão pertencente a sandbox de teste ou gerador fake');
+      } else if (!auditCartao.luhnValido) {
+        aplicarRegra('CARTAO_LUHN_INVALIDO', 40, 'Número do cartão de crédito falhou na verificação algorítmica de integridade (Luhn / Módulo 10)');
+      }
+    }
+
+    // 11. Auditoria de Nome do Titular (Entropia de Shannon, Nomes Trolls & Monôminos)
+    const nomeTitular = transacao.nome || transacao.titular || transacao.nomeTitular;
+    let auditNome = null;
+    if (nomeTitular) {
+      auditNome = AntiFraudePro.analisarNome(nomeTitular);
+      if (auditNome.suspeito) {
+        aplicarRegra('NOME_TITULAR_SUSPEITO_OU_INCOMPLETO', 15, `Nome do titular suspeito: ${auditNome.motivo}`);
+      }
+    }
+
+    // 12. Divergência Geográfica Internacional (IP Estrangeiro em Compra com CPF / Moeda BRL)
+    const paisConexao = (contexto.pais || cf.country || '').toUpperCase();
+    const isNacional = transacao.moeda === 'BRL' || transacao.cpf || transacao.cnpj || !transacao.moeda;
+    if (isNacional && paisConexao && paisConexao !== 'BR' && !contexto.isLocal && paisConexao !== 'LOCAL') {
+      aplicarRegra(
+        'IP_ESTRANGEIRO_COMPRA_NACIONAL',
+        25,
+        `Transação nacional em BRL ou com documento brasileiro originada de conexão internacional (${paisConexao})`
+      );
+    }
+
+    // 13. Execução de Regras Customizadas Injetadas Dinamicamente
     for (const regraCustom of this.config.regrasCustomizadas) {
       if (this.config.regrasDesabilitadas.has(regraCustom.id)) continue;
       try {
@@ -1103,7 +1415,6 @@ export class AntiFraudePro {
     score = Math.min(100, Math.max(0, score));
 
     // Determina nível de risco com base nas faixas dinâmicas configuradas
-    const faixas = this.config.faixas;
     let nivelRisco = 'baixo';
     let recomendacao = 'aprovar';
     let corBadge = '#10b981';
@@ -1129,12 +1440,15 @@ export class AntiFraudePro {
       recomendacao,
       corBadge,
       deviceId: deviceId || 'dev_generico',
+      perfilAplicado: perfilNome || 'padrao',
       fatoresRisco: fatores,
       avisos,
       detalhes: {
         documentoValido: docValido,
         emailAuditado: auditEmail,
         telefoneAuditado: auditTel,
+        cartaoAuditado: auditCartao,
+        nomeTitularAuditado: auditNome,
         gpuVirtualAuditada: gpuCheck,
         lieDetector,
         isHeadlessBot: !!isHeadless,

@@ -1,16 +1,17 @@
 name = "antifraude-pro-api"
 main = "worker.js"
 compatibility_date = "2026-10-01"
+workers_dev = true
 
-routes = [
-  { pattern = "antifraude.ozpro.com.br", custom_domain = true }
-]
+# Gatilho Cron para sincronização semanal automática de bases (Toda segunda-feira às 03:00 UTC)
+[triggers]
+crons = ["0 3 * * 1"]
 
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "77f8849b9c692c78d3d77e26a0babefd"
 CLOUDFLARE_R2_BUCKET = "ozpro-antifraude"
 
-# Bucket R2 para armazenar histórico e listas de reputação de IP / Fingerprint
-[[r2_buckets]]
-binding = "ANTIFRAUDE_R2"
-bucket_name = "ozpro-antifraude"
+# Bucket R2 ativável após habilitar R2 no Dashboard
+# [[r2_buckets]]
+# binding = "ANTIFRAUDE_R2"
+# bucket_name = "ozpro-antifraude"
