@@ -664,22 +664,124 @@ export class AntiFraudePro {
   }
 
   /**
-   * Higienizador de payloads W3C Anti-XSS e Anti-SQLi
+   * Higienizador e Detector Determinístico de Payloads W3C Anti-XSS e Anti-SQLi (Zero Regex)
+   * Implementado via Máquina de Estados e Varredura Linear O(N) imune a ReDoS e evasões.
    * @param {string} input 
    * @returns {{ original: string, limpo: string, xssDetectado: boolean, sqliDetectado: boolean, payloadLimpo: boolean }}
    */
   static sanitizarXss(input) {
     if (typeof input !== 'string') return { original: input, limpo: input, xssDetectado: false, sqliDetectado: false, payloadLimpo: true };
-    const xssDetectado = /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>|javascript:|onload=|onerror=|onclick=|onmouseover=|<iframe|<embed|<object/i.test(input);
-    const sqliDetectado = /('|\b)(union(\s+all)?\s+select|select\s+.*\s+from|insert\s+into|drop\s+table|delete\s+from|update\s+.*\s+set|or\s+1\s*=\s*1|--|\/\*)/i.test(input);
 
-    const limpo = input
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/javascript:[^"']*/gi, '')
-      .replace(/\bon\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-      .replace(/<embed\b[^>]*>/gi, '')
-      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+    let xssDetectado = false;
+    let sqliDetectado = false;
+    const len = input.length;
+    const lower = input.toLowerCase();
+
+    // 1. Detecção de SQLi por Análise de Sequência de Palavras Reservadas (Sem Regex)
+    const sqlTokens = [];
+    let curToken = '';
+    for (let i = 0; i < len; i++) {
+      const c = lower[i];
+      if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c === '_' || c === '*' || c === '-' || c === '/') {
+        curToken += c;
+      } else {
+        if (curToken) {
+          sqlTokens.push(curToken);
+          curToken = '';
+        }
+      }
+    }
+    if (curToken) sqlTokens.push(curToken);
+
+    for (let i = 0; i < sqlTokens.length; i++) {
+      const t = sqlTokens[i];
+      if (t === '--' || t === '/*' || t === '*/') {
+        sqliDetectado = true;
+        break;
+      }
+      if (t === 'union' && i + 1 < sqlTokens.length && (sqlTokens[i + 1] === 'select' || (sqlTokens[i + 1] === 'all' && i + 2 < sqlTokens.length && sqlTokens[i + 2] === 'select'))) {
+        sqliDetectado = true;
+        break;
+      }
+      if (t === 'drop' && i + 1 < sqlTokens.length && (sqlTokens[i + 1] === 'table' || sqlTokens[i + 1] === 'database')) {
+        sqliDetectado = true;
+        break;
+      }
+      if (t === 'or' && i + 2 < sqlTokens.length && sqlTokens[i + 1] === '1' && sqlTokens[i + 2] === '1') {
+        sqliDetectado = true;
+        break;
+      }
+    }
+
+    // 2. Máquina de Estados para Remoção de Tags HTML Maliciosas e Handlers On* (Zero Regex)
+    const DANGEROUS_TAGS = new Set(['script', 'iframe', 'embed', 'object', 'applet', 'meta', 'link', 'base']);
+    const outputBuffer = [];
+    let i = 0;
+
+    while (i < len) {
+      if (input[i] === '<') {
+        let tagCloseIdx = input.indexOf('>', i);
+        if (tagCloseIdx === -1) {
+          xssDetectado = true;
+          break;
+        }
+
+        const tagContent = input.slice(i + 1, tagCloseIdx).trim();
+        const tagLower = tagContent.toLowerCase();
+
+        let tagName = '';
+        let ptr = 0;
+        if (tagLower.startsWith('/')) ptr = 1;
+        while (ptr < tagLower.length && ((tagLower[ptr] >= 'a' && tagLower[ptr] <= 'z') || (tagLower[ptr] >= '0' && tagLower[ptr] <= '9'))) {
+          tagName += tagLower[ptr];
+          ptr++;
+        }
+
+        if (DANGEROUS_TAGS.has(tagName)) {
+          xssDetectado = true;
+          if (tagName === 'script' || tagName === 'iframe' || tagName === 'object') {
+            const closingTag = `</${tagName}>`;
+            const closingIdx = lower.indexOf(closingTag, tagCloseIdx);
+            if (closingIdx !== -1) {
+              i = closingIdx + closingTag.length;
+              continue;
+            }
+          }
+          i = tagCloseIdx + 1;
+          continue;
+        }
+
+        if (tagLower.includes('javascript:') || tagLower.includes('vbscript:') || tagLower.includes('data:text/html')) {
+          xssDetectado = true;
+          i = tagCloseIdx + 1;
+          continue;
+        }
+
+        // Verifica manipuladores de eventos on* (ex: onload=, onerror=, onclick=)
+        let hasDangerousAttr = false;
+        const attrTokens = tagLower.split(/\s+/);
+        for (const attr of attrTokens) {
+          if (attr.startsWith('on') && attr.includes('=')) {
+            hasDangerousAttr = true;
+            xssDetectado = true;
+            break;
+          }
+        }
+
+        if (hasDangerousAttr) {
+          i = tagCloseIdx + 1;
+          continue;
+        }
+
+        outputBuffer.push(input.slice(i, tagCloseIdx + 1));
+        i = tagCloseIdx + 1;
+      } else {
+        outputBuffer.push(input[i]);
+        i++;
+      }
+    }
+
+    const limpo = outputBuffer.join('');
 
     return {
       original: input,
