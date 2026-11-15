@@ -10,25 +10,30 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --bg: #050811;
-      --card: #0c1222;
-      --card-inner: #111a30;
-      --card-hover: #16223f;
-      --primary: #10b981;
-      --primary-glow: rgba(16, 185, 129, 0.25);
+      --bg: #0b0f19;
+      --card: #111827;
+      --card-inner: #0f172a;
+      --card-hover: #162032;
+      --mint: #a3e635;
+      --mint-glow: rgba(163, 230, 53, 0.28);
+      --primary: #a3e635;
+      --primary-glow: rgba(163, 230, 53, 0.25);
       --accent: #38bdf8;
       --danger: #ef4444;
       --danger-glow: rgba(239, 68, 68, 0.25);
       --warning: #f59e0b;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(16, 185, 129, 0.5);
+      --border: #1e293b;
+      --border-focus: rgba(163, 230, 53, 0.5);
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --code-bg: #030712;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(1000px 500px at 50% -80px, rgba(163, 230, 53, 0.08) 0%, transparent 60%),
+        radial-gradient(800px 400px at 100% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 50%);
       color: var(--text);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       line-height: 1.6;
@@ -48,10 +53,10 @@
       align-items: center;
       gap: 8px;
       padding: 6px 16px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      background: rgba(163, 230, 53, 0.12);
+      border: 1px solid rgba(163, 230, 53, 0.3);
       border-radius: 9999px;
-      color: var(--primary);
+      color: var(--mint);
       font-size: 0.82rem;
       font-weight: 700;
       letter-spacing: 0.05em;
@@ -61,9 +66,9 @@
     .badge-pulse {
       width: 8px;
       height: 8px;
-      background: var(--primary);
+      background: var(--mint);
       border-radius: 50%;
-      box-shadow: 0 0 10px var(--primary);
+      box-shadow: 0 0 10px var(--mint);
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
