@@ -378,25 +378,110 @@
 </head>
 <body>
 
-  <div style="background:#080c16;border-bottom:1px solid rgba(255,255,255,0.08);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-    <div style="display:flex;align-items:center;gap:12px">
-      <a href="/ponte" style="color:var(--text);text-decoration:none;font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px">
-        <i class="fas fa-bolt" style="color:#38bdf8"></i> Ponte APIs
+  <div class="app-shell">
+    <!-- SIDEBAR UNIFICADA PONTE SUITE -->
+    <aside class="sidebar">
+      <a class="brand" href="https://ponte-marketplace.maputo2.workers.dev/#catalogo">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div class="brand-copy">
+          <strong>ponte</strong>
+          <small>API MARKET ? OZPRO</small>
+        </div>
       </a>
-      <span style="color:rgba(255,255,255,0.2)">/</span>
-      <span style="color:#10b981;font-weight:700;font-size:14px"><i class="fas fa-shield-halved"></i> AntiFraude Pro</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <a href="/admin/apis.html" style="color:#f59e0b;text-decoration:none;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">
-        <i class="fas fa-key"></i> Chaves &amp; Gateways
-      </a>
-      <a href="/login.html" style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;text-decoration:none;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px">
-        <i class="fas fa-arrow-right-to-bracket"></i> Login no Sistema
-      </a>
-    </div>
-  </div>
 
-  <div class="container">
+      <div class="nav-section-label">Valida??o & Seguran?a</div>
+      <nav class="primary-nav">
+        <a class="nav-link is-active" href="#">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>AntiFraude Pro</span>
+        </a>
+        <a class="nav-link" href="https://clepta2.github.io/passvalidator-pro/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>PassValidator HIBP</span>
+        </a>
+        <a class="nav-link" href="https://clientinspector-pro-api.clepta2.workers.dev/api/meu-ip">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+          <span>ClientInspector Forense</span>
+        </a>
+      </nav>
+
+      <div class="nav-section-label">Financeiro & Pagamentos</div>
+      <nav class="primary-nav">
+        <a class="nav-link" href="https://clepta2.github.io/boletovalidator-pro/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10M7 12h10M7 17h6"/></svg>
+          <span>BoletoValidator Pro</span>
+        </a>
+        <a class="nav-link" href="https://clepta2.github.io/pixvalidator-pro/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="1"/><rect width="8" height="8" x="13" y="3" rx="1"/><rect width="8" height="8" x="3" y="13" rx="1"/><path d="M13 13h4v4h-4z"/></svg>
+          <span>Pix Gateway Pro</span>
+        </a>
+      </nav>
+
+      <div class="nav-section-label">Design & Assets</div>
+      <nav class="primary-nav">
+        <a class="nav-link" href="https://icons-pro-api.maputo2.workers.dev/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+          <span>?cones & Logos (3.470+)</span>
+        </a>
+        <a class="nav-link" href="https://graficos-pro-api.maputo2.workers.dev/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>Gr?ficos Pro (39 Tipos)</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="status-row">
+          <span class="status-dot"></span>
+          <span>Borda Cloudflare Anycast</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ?REA PRINCIPAL -->
+    <div class="main-area">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="breadcrumb">
+          <a href="https://ponte-marketplace.maputo2.workers.dev/#catalogo">Workspace</a>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          <a href="https://ponte-marketplace.maputo2.workers.dev/#catalogo">Valida??o & Seguran?a</a>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          <strong>Seguran?a & AntiFraude Pro</strong>
+        </div>
+
+        <div class="topbar-actions">
+          <a href="https://ponte-marketplace.maputo2.workers.dev/#catalogo" class="btn btn-secondary btn-sm" style="text-decoration:none;">Marketplace ?</a>
+          <button class="theme-toggle-btn" id="theme-toggle-btn" title="Alternar tema">??</button>
+        </div>
+      </header>
+
+      <!-- GUIA DID?TICO: O QUE EST? ACONTECENDO & O QUE FAZER -->
+      <div class="guide-card" style="margin-bottom: 24px;">
+        <div class="guide-header">
+          <strong>?? Como funciona a an?lise de risco e o que voc? deve fazer?</strong>
+          <span class="badge green">Score Heur?stico 0 a 100</span>
+        </div>
+        <div class="guide-steps">
+          <div class="guide-step">
+            <span class="guide-step-tag">Passo 1: Inserir Dados da Transa??o</span>
+            <p>Informe os dados da transa??o, cart?o de cr?dito, e-mail do cliente ou o IP de conex?o que deseja periciar.</p>
+          </div>
+          <div class="guide-step">
+            <span class="guide-step-tag">Passo 2: Varredura de Amea?as</span>
+            <p>O motor cruza dados contra redes Tor, VPNs comerciais de anonimato, proxies de datacenter e vazamentos de credenciais.</p>
+          </div>
+          <div class="guide-step">
+            <span class="guide-step-tag">Passo 3: Decis?o Antifraude</span>
+            <p>?? <strong>Score Baixo:</strong> Aprova??o autom?tica. ?? <strong>M?dio:</strong> An?lise manual. ?? <strong>Alto:</strong> Bloqueio do pedido.</p>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="content-wrap">
+
     <header>
       <div class="badge-top">
         <span class="badge-pulse"></span>
