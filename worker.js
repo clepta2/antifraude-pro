@@ -45,8 +45,7 @@ function checkRateLimit(ip, limit = 120, windowMs = 60000) {
  */
 async function sincronizarBases(env = {}) {
   const FONTES = [
-    'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf',
-    'https://cdn.jsdelivr.net/gh/disposable-email-domains/disposable-email-domains@main/disposable_email_blocklist.conf'
+    'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf'
   ];
 
   let dominios = null;
